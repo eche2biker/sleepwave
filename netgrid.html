@@ -3,33 +3,32 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>◈ NETGRID — Network Admin v5</title>
+  <title>◈ NETGRID — Network Admin v6</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #020c04; overflow: hidden; }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #020c04; }
-    ::-webkit-scrollbar-thumb { background: #00ff2222; border-radius: 3px; }
-    input[type=range] { -webkit-appearance: none; background: transparent; height: 18px; }
-    input[type=range]::-webkit-slider-runnable-track { background: #00ff2218; height: 3px; border-radius: 2px; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; background: #00ff22; border-radius: 50%; margin-top: -4px; cursor: pointer; }
-    select option { background: #030e05; color: #00ff22; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:#020c04; overflow:hidden; font-family:'Share Tech Mono',monospace; }
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:#020c04; }
+    ::-webkit-scrollbar-thumb { background:#00ff2222; border-radius:3px; }
+    ::-webkit-scrollbar-thumb:hover { background:#00ff2244; }
+    input[type=range] { -webkit-appearance:none; background:transparent; height:18px; }
+    input[type=range]::-webkit-slider-runnable-track { background:#00ff2218; height:3px; border-radius:2px; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:11px; height:11px; background:#00ff22; border-radius:50%; margin-top:-4px; cursor:pointer; }
+    select option { background:#030e05; color:#00ff22; }
     @keyframes ledPulse { 0%,100%{opacity:1} 50%{opacity:0.28} }
     @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
     @keyframes fs { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
   </style>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
 </head>
 <body>
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useRef, useEffect, useMemo, useCallback, memo } = React;
-
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2,9);
@@ -76,6 +75,11 @@ function mkPC(r,c) {
     bajaReason:null, addedBy:"system",
     addedAt:new Date(Date.now()-Math.random()*365*24*3600000).toISOString(),
     history:[],
+    winPass:"", email:"", emailPass:"",
+    vpn:{servidor:"",usuario:"",pass:"",protocolo:"OpenVPN"},
+    office365:false,
+    carpetas:[{nombre:"\\\\servidor\\Contabilidad",acceso:Math.random()>0.5},{nombre:"\\\\servidor\\Compartida",acceso:Math.random()>0.5}],
+    programas:["Chrome","Antivirus","Office 365","Adobe Reader"].filter(()=>Math.random()>0.4),
   };
 }
 
@@ -315,53 +319,256 @@ function BajaModal({pc,onClose,onConfirm}) {
 }
 
 function PCModal({pc,onClose,onSave,onDelete,onBaja,onHist,cu,snd}) {
-  const [d,setD] = useState({...pc});
+
+// ── Section component ────────────────────────────────────────────────────────
+function Section({title,icon,color,children,defaultOpen}) {
+  const [open,setOpen] = useState(defaultOpen!==false);
+  const c = color||"#00ff22";
+  return (
+    <div style={{marginBottom:10,border:`1px solid ${c}18`,borderRadius:6,overflow:"hidden"}}>
+      <div onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:c+"08",cursor:"pointer",userSelect:"none"}}>
+        <span style={{fontSize:12}}>{icon}</span>
+        <span style={{fontSize:8,letterSpacing:3,color:c,flex:1}}>{title}</span>
+        <span style={{fontSize:10,color:c,opacity:0.5}}>{open?"▾":"▸"}</span>
+      </div>
+      {open&&<div style={{padding:"12px",background:"#020c04"}}>{children}</div>}
+    </div>
+  );
+}
+
+// ── Password field with show/hide ─────────────────────────────────────────────
+function PassField({label,value,onChange,disabled,inp}) {
+  const [show,setShow] = useState(false);
+  return (
+    <div>
+      <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>{label}</div>
+      <div style={{position:"relative"}}>
+        <input type={show?"text":"password"} value={value||""} onChange={onChange} disabled={disabled}
+          style={{...inp,paddingRight:28,opacity:disabled?0.55:1,cursor:disabled?"not-allowed":"text"}}
+          onFocus={e=>!disabled&&(e.target.style.borderColor="#00ff22")}
+          onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+        <span onClick={()=>setShow(s=>!s)} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",cursor:"pointer",fontSize:11,opacity:0.4,color:"#00ff22",userSelect:"none"}}>{show?"◎":"●"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── List with checkboxes + add button ─────────────────────────────────────────
+function CheckList({items,onToggle,onAdd,onRemove,canEdit,color}) {
+  const [newItem,setNewItem] = useState("");
+  const [adding,setAdding] = useState(false);
+  const c = color||"#00ff22";
+  return (
+    <div>
+      {items.map((item,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,padding:"5px 8px",background:"#030e05",borderRadius:4,border:`1px solid ${item.acceso!==undefined?(item.acceso?c+"25":"#ff222218"):"#00ff2210"}`}}>
+          {item.acceso!==undefined&&(
+            <div onClick={()=>canEdit&&onToggle(i)} style={{width:16,height:16,borderRadius:3,border:`1.5px solid ${item.acceso?c:"#444"}`,background:item.acceso?c+"25":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:canEdit?"pointer":"default",flexShrink:0}}>
+              {item.acceso&&<span style={{fontSize:10,color:c}}>✓</span>}
+            </div>
+          )}
+          <span style={{flex:1,fontSize:9,color:item.acceso===false?"#ff222260":item.acceso?"#00ff22":"#00ff22",wordBreak:"break-all"}}>{item.nombre||item}</span>
+          {canEdit&&<span onClick={()=>onRemove(i)} style={{cursor:"pointer",fontSize:10,color:"#ff222240",flexShrink:0}} onMouseOver={e=>e.target.style.color="#ff2222"} onMouseOut={e=>e.target.style.color="#ff222240"}>✕</span>}
+        </div>
+      ))}
+      {canEdit&&(
+        adding?(
+          <div style={{display:"flex",gap:6,marginTop:6}}>
+            <input autoFocus value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder="Agregar..." onKeyDown={e=>{if(e.key==="Enter"&&newItem.trim()){onAdd(newItem.trim());setNewItem("");setAdding(false);}if(e.key==="Escape")setAdding(false);}}
+              style={{flex:1,background:"#0a180a",border:`1px solid ${c}40`,color:"#00ff22",fontFamily:"monospace",fontSize:10,padding:"5px 8px",borderRadius:4,outline:"none"}}/>
+            <button onClick={()=>{if(newItem.trim()){onAdd(newItem.trim());setNewItem("");}setAdding(false);}} style={{padding:"4px 10px",background:c+"18",border:`1px solid ${c}`,color:c,fontFamily:"monospace",fontSize:9,cursor:"pointer",borderRadius:4}}>✓</button>
+            <button onClick={()=>setAdding(false)} style={{padding:"4px 8px",background:"transparent",border:"1px solid #333",color:"#555",fontFamily:"monospace",fontSize:9,cursor:"pointer",borderRadius:4}}>✕</button>
+          </div>
+        ):(
+          <button onClick={()=>setAdding(true)} style={{marginTop:6,padding:"4px 10px",background:"transparent",border:`1px dashed ${c}35`,color:c,opacity:0.6,fontFamily:"monospace",fontSize:9,cursor:"pointer",borderRadius:4,width:"100%",transition:"all 0.15s"}} onMouseOver={e=>e.currentTarget.style.opacity="1"} onMouseOut={e=>e.currentTarget.style.opacity="0.6"}>+ Agregar</button>
+        )
+      )}
+    </div>
+  );
+}
+
+// ── Enhanced PCModal ──────────────────────────────────────────────────────────
+function PCModal({pc,onClose,onSave,onDelete,onBaja,onHist,cu,snd}) {
+  const [d,setD] = useState({
+    ...pc,
+    winPass: pc.winPass||"",
+    email: pc.email||"",
+    emailPass: pc.emailPass||"",
+    vpn: pc.vpn||{servidor:"",usuario:"",pass:"",protocolo:"OpenVPN"},
+    office365: pc.office365||false,
+    carpetas: pc.carpetas||[],
+    programas: pc.programas||[],
+  });
   const p = PERMS[cu.role];
   const set = (k,v) => setD(x=>({...x,[k]:v}));
+  const setVpn = (k,v) => setD(x=>({...x,vpn:{...x.vpn,[k]:v}}));
   const inp = {background:"#0a180a",border:"1px solid #00ff2218",color:"#00ff22",fontFamily:"monospace",fontSize:11,padding:"6px 9px",width:"100%",borderRadius:4,outline:"none",boxSizing:"border-box"};
+
+  const toggleCarpeta = (i) => setD(x=>({...x,carpetas:x.carpetas.map((c,j)=>j===i?{...c,acceso:!c.acceso}:c)}));
+  const addCarpeta = (nombre) => setD(x=>({...x,carpetas:[...x.carpetas,{nombre,acceso:false}]}));
+  const delCarpeta = (i) => setD(x=>({...x,carpetas:x.carpetas.filter((_,j)=>j!==i)}));
+  const addPrograma = (nombre) => setD(x=>({...x,programas:[...x.programas,nombre]}));
+  const delPrograma = (i) => setD(x=>({...x,programas:x.programas.filter((_,j)=>j!==i)}));
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,8,2,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(8px)"}}>
-      <div style={{background:"#030e05",border:"1px solid #00ff2228",borderRadius:10,padding:"24px 28px",width:440,maxHeight:"88vh",overflowY:"auto",fontFamily:"monospace",color:"#00ff22"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,paddingBottom:12,borderBottom:"1px solid #00ff2210"}}>
-          <div>
-            <div style={{fontSize:13,letterSpacing:3,fontWeight:700}}>◈ {d.name}</div>
-            <div style={{fontSize:7,opacity:0.3,marginTop:2}}>POR {(d.addedBy||"system").toUpperCase()}</div>
-          </div>
-          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <div style={{padding:"3px 8px",background:SC[d.status]+"15",border:`1px solid ${SC[d.status]}35`,borderRadius:3,fontSize:8,color:SC[d.status],letterSpacing:2}}>{d.status}</div>
-            <button onClick={()=>onHist(pc)} style={{padding:"3px 8px",background:"transparent",border:"1px solid #00aaff28",color:"#00aaff",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3}}>📋</button>
-          </div>
-        </div>
-        {!p.edit&&<div style={{padding:"8px 10px",background:"#001a00",border:"1px solid #00ff2215",borderRadius:4,marginBottom:12,fontSize:8,color:"#00ff22",opacity:0.55}}>👁 SOLO LECTURA · {cu.role}</div>}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-          {[["NOMBRE",d.name,"name"],["IP",d.ip,"ip"],["USUARIO",d.user||"","user"],["DPTO",d.dept,"dept"],["SISTEMA",d.os,"os"],["UPTIME",d.uptime,"uptime"]].map(([label,val,key])=>(
-            <div key={key}>
-              <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>{label}</div>
-              <input value={val||""} onChange={e=>set(key,e.target.value)} disabled={!p.edit} style={{...inp,opacity:p.edit?1:0.55,cursor:p.edit?"text":"not-allowed"}} onFocus={e=>p.edit&&(e.target.style.borderColor="#00ff22")} onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,8,2,0.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#030e05",border:"1px solid #00ff2228",borderRadius:10,width:500,maxHeight:"90vh",display:"flex",flexDirection:"column",fontFamily:"monospace",color:"#00ff22",boxShadow:"0 0 40px #00ff2210"}}>
+
+        {/* Header sticky */}
+        <div style={{padding:"18px 22px 14px",borderBottom:"1px solid #00ff2212",flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:14,letterSpacing:3,fontWeight:700}}>◈ {d.name}</div>
+              <div style={{fontSize:7,opacity:0.3,marginTop:2}}>AGREGADO POR {(d.addedBy||"system").toUpperCase()}</div>
             </div>
-          ))}
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div style={{padding:"3px 8px",background:SC[d.status]+"15",border:`1px solid ${SC[d.status]}35`,borderRadius:3,fontSize:8,color:SC[d.status],letterSpacing:2}}>{d.status}</div>
+              <button onClick={()=>onHist(pc)} style={{padding:"3px 8px",background:"transparent",border:"1px solid #00aaff28",color:"#00aaff",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3}}>📋</button>
+              <button onClick={onClose} style={{padding:"3px 8px",background:"transparent",border:"1px solid #333",color:"#555",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:3}}>✕</button>
+            </div>
+          </div>
+          {!p.edit&&<div style={{marginTop:10,padding:"6px 10px",background:"#001a00",border:"1px solid #00ff2215",borderRadius:4,fontSize:8,color:"#00ff22",opacity:0.55}}>👁 SOLO LECTURA · {cu.role}</div>}
         </div>
-        {p.edit&&(
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:7}}>ESTADO</div>
-            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {STATUSES.map(s=>(
-                <button key={s} onClick={()=>set("status",s)} style={{padding:"5px 10px",flex:1,background:d.status===s?SC[s]+"15":"transparent",border:`1px solid ${d.status===s?SC[s]:SC[s]+"22"}`,color:d.status===s?SC[s]:SC[s]+"55",fontFamily:"inherit",fontSize:7,letterSpacing:1,cursor:"pointer",borderRadius:3,transition:"all 0.15s"}}>{s}</button>
+
+        {/* Scrollable body */}
+        <div style={{flex:1,overflowY:"auto",padding:"14px 22px"}}>
+
+          {/* ── SECCIÓN 1: Info general ── */}
+          <Section title="INFORMACIÓN GENERAL" icon="🖥️" color="#00ff22" defaultOpen={true}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              {[["NOMBRE",d.name,"name"],["IP",d.ip,"ip"],["USUARIO",d.user||"","user"],["DPTO",d.dept,"dept"],["SISTEMA",d.os,"os"],["UPTIME",d.uptime,"uptime"]].map(([label,val,key])=>(
+                <div key={key}>
+                  <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>{label}</div>
+                  <input value={val||""} onChange={e=>set(key,e.target.value)} disabled={!p.edit}
+                    style={{...inp,opacity:p.edit?1:0.55,cursor:p.edit?"text":"not-allowed"}}
+                    onFocus={e=>p.edit&&(e.target.style.borderColor="#00ff22")}
+                    onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+                </div>
               ))}
             </div>
-          </div>
-        )}
-        {d.status==="ACTIVO"&&(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            {[["CPU %",d.cpu,"cpu"],["RAM %",d.ram,"ram"]].map(([l,v,k])=>(
-              <div key={k}>
-                <div style={{fontSize:7,letterSpacing:1,opacity:0.35,marginBottom:3}}>{l} <span style={{color:v>80?"#ff2222":v>50?"#ffff00":"#00ff22"}}>{v}%</span></div>
-                <input type="range" min="0" max="100" value={v} onChange={e=>set(k,+e.target.value)} disabled={!p.edit} style={{width:"100%",accentColor:"#00ff22",cursor:p.edit?"pointer":"not-allowed"}}/>
+            {/* Estado */}
+            {p.edit&&(
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:7}}>ESTADO</div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                  {STATUSES.map(s=>(
+                    <button key={s} onClick={()=>set("status",s)} style={{padding:"4px 8px",flex:1,background:d.status===s?SC[s]+"15":"transparent",border:`1px solid ${d.status===s?SC[s]:SC[s]+"22"}`,color:d.status===s?SC[s]:SC[s]+"55",fontFamily:"inherit",fontSize:7,letterSpacing:1,cursor:"pointer",borderRadius:3,transition:"all 0.15s"}}>{s}</button>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-        <div style={{display:"flex",gap:7}}>
+            )}
+            {/* CPU/RAM */}
+            {d.status==="ACTIVO"&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:10}}>
+                {[["CPU %",d.cpu,"cpu"],["RAM %",d.ram,"ram"]].map(([l,v,k])=>(
+                  <div key={k}>
+                    <div style={{fontSize:7,opacity:0.35,marginBottom:3}}>{l} <span style={{color:v>80?"#ff2222":v>50?"#ffff00":"#00ff22"}}>{v}%</span></div>
+                    <input type="range" min="0" max="100" value={v} onChange={e=>set(k,+e.target.value)} disabled={!p.edit} style={{width:"100%",accentColor:"#00ff22"}}/>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {/* ── SECCIÓN 2: Credenciales Windows ── */}
+          <Section title="CREDENCIALES WINDOWS" icon="🔑" color="#00aaff">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>USUARIO WINDOWS</div>
+                <input value={d.user||""} onChange={e=>set("user",e.target.value)} disabled={!p.edit}
+                  style={{...inp,opacity:p.edit?1:0.55}}
+                  onFocus={e=>p.edit&&(e.target.style.borderColor="#00aaff")}
+                  onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+              </div>
+              <PassField label="CONTRASEÑA WINDOWS" value={d.winPass} onChange={e=>set("winPass",e.target.value)} disabled={!p.edit} inp={inp}/>
+            </div>
+          </Section>
+
+          {/* ── SECCIÓN 3: Correo ── */}
+          <Section title="CORREO ELECTRÓNICO" icon="📧" color="#ff8800">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>CORREO</div>
+                <input type="email" value={d.email||""} onChange={e=>set("email",e.target.value)} disabled={!p.edit}
+                  placeholder="usuario@empresa.com"
+                  style={{...inp,opacity:p.edit?1:0.55}}
+                  onFocus={e=>p.edit&&(e.target.style.borderColor="#ff8800")}
+                  onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+              </div>
+              <PassField label="CONTRASEÑA CORREO" value={d.emailPass} onChange={e=>set("emailPass",e.target.value)} disabled={!p.edit} inp={inp}/>
+            </div>
+            {/* Office 365 toggle */}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12,padding:"8px 10px",background:"#0a0a1a",border:"1px solid #00aaff18",borderRadius:5}}>
+              <div onClick={()=>p.edit&&set("office365",!d.office365)} style={{width:20,height:20,borderRadius:4,border:`2px solid ${d.office365?"#00aaff":"#333"}`,background:d.office365?"#00aaff22":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:p.edit?"pointer":"default",flexShrink:0}}>
+                {d.office365&&<span style={{fontSize:13,color:"#00aaff"}}>✓</span>}
+              </div>
+              <div>
+                <div style={{fontSize:9,color:d.office365?"#00aaff":"#00ff22",letterSpacing:2}}>OFFICE 365</div>
+                <div style={{fontSize:7,opacity:0.35}}>{d.office365?"Licencia activa":"Sin licencia"}</div>
+              </div>
+              {d.office365&&<span style={{marginLeft:"auto",fontSize:18}}>🟦</span>}
+            </div>
+          </Section>
+
+          {/* ── SECCIÓN 4: VPN ── */}
+          <Section title="DATOS VPN" icon="🔒" color="#a855f7">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>SERVIDOR / IP VPN</div>
+                <input value={d.vpn.servidor||""} onChange={e=>setVpn("servidor",e.target.value)} disabled={!p.edit} placeholder="vpn.empresa.com"
+                  style={{...inp,opacity:p.edit?1:0.55}}
+                  onFocus={e=>p.edit&&(e.target.style.borderColor="#a855f7")}
+                  onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+              </div>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>PROTOCOLO</div>
+                <select value={d.vpn.protocolo||"OpenVPN"} onChange={e=>setVpn("protocolo",e.target.value)} disabled={!p.edit}
+                  style={{...inp,cursor:p.edit?"pointer":"not-allowed",opacity:p.edit?1:0.55}}>
+                  {["OpenVPN","WireGuard","L2TP","PPTP","IKEv2","Cisco AnyConnect"].map(v=><option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>USUARIO VPN</div>
+                <input value={d.vpn.usuario||""} onChange={e=>setVpn("usuario",e.target.value)} disabled={!p.edit}
+                  style={{...inp,opacity:p.edit?1:0.55}}
+                  onFocus={e=>p.edit&&(e.target.style.borderColor="#a855f7")}
+                  onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+              </div>
+              <PassField label="CONTRASEÑA VPN" value={d.vpn.pass} onChange={e=>setVpn("pass",e.target.value)} disabled={!p.edit} inp={inp}/>
+            </div>
+          </Section>
+
+          {/* ── SECCIÓN 5: Carpetas compartidas ── */}
+          <Section title="CARPETAS COMPARTIDAS" icon="📁" color="#ffff00">
+            <div style={{fontSize:7,opacity:0.3,marginBottom:8,letterSpacing:1}}>✓ = TIENE ACCESO · ☐ = SIN ACCESO</div>
+            <CheckList
+              items={d.carpetas}
+              onToggle={toggleCarpeta}
+              onAdd={addCarpeta}
+              onRemove={delCarpeta}
+              canEdit={p.edit}
+              color="#ffff00"
+            />
+            {d.carpetas.length===0&&!p.edit&&<div style={{fontSize:9,opacity:0.3,textAlign:"center",padding:"10px"}}>Sin carpetas registradas</div>}
+          </Section>
+
+          {/* ── SECCIÓN 6: Programas instalados ── */}
+          <Section title="PROGRAMAS INSTALADOS" icon="💿" color="#00ff22">
+            <CheckList
+              items={d.programas.map(nombre=>({nombre,acceso:undefined}))}
+              onToggle={()=>{}}
+              onAdd={addPrograma}
+              onRemove={delPrograma}
+              canEdit={p.edit}
+              color="#00ff22"
+            />
+            {d.programas.length===0&&<div style={{fontSize:9,opacity:0.3,textAlign:"center",padding:"10px"}}>Sin programas registrados</div>}
+          </Section>
+
+        </div>
+
+        {/* Footer sticky */}
+        <div style={{padding:"14px 22px",borderTop:"1px solid #00ff2212",display:"flex",gap:7,flexShrink:0,background:"#030e05"}}>
           {p.edit&&<button onClick={()=>{onSave(d);snd.save();}} style={{flex:2,padding:"9px",background:"#0a1a0a",border:"1px solid #00ff22",color:"#00ff22",fontFamily:"inherit",fontSize:9,letterSpacing:3,cursor:"pointer",borderRadius:4}} onMouseOver={e=>e.target.style.background="#0f2210"} onMouseOut={e=>e.target.style.background="#0a1a0a"}>💾 GUARDAR</button>}
           {p.edit&&d.status!=="BAJA"&&<button onClick={()=>onBaja(pc)} style={{flex:1,padding:"9px",background:"#1a0000",border:"1px solid #ff222235",color:"#ff2222",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:4}}>⬇ BAJA</button>}
           {p.del&&<button onClick={()=>{onDelete(pc.id);snd.del();}} style={{flex:1,padding:"9px",background:"#1a0000",border:"1px solid #ff2222",color:"#ff2222",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:4}}>✕</button>}
@@ -371,7 +578,6 @@ function PCModal({pc,onClose,onSave,onDelete,onBaja,onHist,cu,snd}) {
     </div>
   );
 }
-
 function AddModal({onClose,onAdd}) {
   const [qty,setQty] = useState(1);
   const [pcs,setPcs] = useState(20);
