@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>◈ NETGRID — Network Admin v5</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #020c04; overflow: hidden; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #020c04; }
+    ::-webkit-scrollbar-thumb { background: #00ff2222; border-radius: 3px; }
+    input[type=range] { -webkit-appearance: none; background: transparent; height: 18px; }
+    input[type=range]::-webkit-slider-runnable-track { background: #00ff2218; height: 3px; border-radius: 2px; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; background: #00ff22; border-radius: 50%; margin-top: -4px; cursor: pointer; }
+    select option { background: #030e05; color: #00ff22; }
+    @keyframes ledPulse { 0%,100%{opacity:1} 50%{opacity:0.28} }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    @keyframes fs { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useRef, useEffect, useMemo, useCallback, memo } = React;
+
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2,9);
+const rndPing = () => Math.floor(Math.random()*80)+1;
+const nowT = () => new Date().toLocaleTimeString("es-MX",{hour12:false});
+const nowDT = () => new Date().toLocaleString("es-MX",{hour12:false});
+
+const USERS = ["jlopez","mgarcia","drojas","aherrera","cgomez","fsanchez"];
+const OSS   = ["Win 11","Win 10","Ubuntu 22","Win Server","macOS"];
+const DEPTS = ["TI","Contabilidad","RRHH","Dirección","Ventas","Almacén","Soporte"];
+const STATUSES = ["ACTIVO","MANTENIMIENTO","BAJA","REEMPLAZADO"];
+const SC = { ACTIVO:"#00ff22", MANTENIMIENTO:"#ffff00", BAJA:"#ff2222", REEMPLAZADO:"#00aaff" };
+const BAJA_WHY = ["Descompuesto","Obsoleto","Robado","Actualización","Daño físico","Otro"];
+const PAGE = 20;
+
+const ACCOUNTS = [
+  {id:"u1",username:"admin",  password:"admin123",name:"Carlos Gómez",role:"ADMIN",  dept:"TI",       avatar:"CG"},
+  {id:"u2",username:"tecnico",password:"tec456",  name:"Diana Rojas", role:"TECNICO",dept:"Soporte",  avatar:"DR"},
+  {id:"u3",username:"viewer", password:"view789", name:"Pedro Vega",  role:"VIEWER", dept:"Dirección",avatar:"PV"},
+];
+const PERMS = {
+  ADMIN:   {edit:true, del:true, add:true, delRow:true},
+  TECNICO: {edit:true, del:false,add:false,delRow:false},
+  VIEWER:  {edit:false,del:false,add:false,delRow:false},
+};
+const RC = {ADMIN:"#00ff22",TECNICO:"#ffff00",VIEWER:"#00aaff"};
+
+function mkPC(r,c) {
+  const roll = Math.random();
+  const status = roll>0.88?"MANTENIMIENTO":roll>0.94?"BAJA":"ACTIVO";
+  const on = status==="ACTIVO";
+  return {
+    id:uid(),
+    name:`PC-${String(r+1).padStart(2,"0")}${String(c+1).padStart(2,"0")}`,
+    ip:`192.168.${r+1}.${c+1}`,
+    status, ping:on?rndPing():null,
+    user:on?USERS[Math.floor(Math.random()*USERS.length)]:null,
+    os:OSS[Math.floor(Math.random()*OSS.length)],
+    dept:DEPTS[Math.floor(Math.random()*DEPTS.length)],
+    cpu:on?Math.floor(Math.random()*85)+5:0,
+    ram:on?Math.floor(Math.random()*80)+10:0,
+    uptime:on?`${Math.floor(Math.random()*72)}h ${Math.floor(Math.random()*60)}m`:"—",
+    alerts:Math.random()>0.85?["CPU alta"]:[],
+    bajaReason:null, addedBy:"system",
+    addedAt:new Date(Date.now()-Math.random()*365*24*3600000).toISOString(),
+    history:[],
+  };
+}
+
+function mkRows(n,perRow) {
+  return Array.from({length:n},(_,r)=>({
+    id:uid(), label:`Fila ${r+1}`,
+    pcs:Array.from({length:perRow},(_,c)=>mkPC(r,c)),
+  }));
+}
+
+// ── Sound ──────────────────────────────────────────────────────────────────
+function useSound() {
+  const ctx = useRef(null);
+  const go = (f,d,t,v) => {
+    try {
+      if (!ctx.current) ctx.current = new (window.AudioContext||window.webkitAudioContext)();
+      const o=ctx.current.createOscillator(), g=ctx.current.createGain();
+      o.connect(g); g.connect(ctx.current.destination);
+      o.type=t; o.frequency.setValueAtTime(f,ctx.current.currentTime);
+      g.gain.setValueAtTime(v,ctx.current.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.current.currentTime+d);
+      o.start(); o.stop(ctx.current.currentTime+d);
+    } catch(e) {}
+  };
+  return {
+    click:   ()=>go(800,0.05,"square",0.06),
+    save:    ()=>{go(600,0.05,"sine",0.06);setTimeout(()=>go(900,0.08,"sine",0.06),60);},
+    del:     ()=>{go(300,0.12,"sawtooth",0.08);setTimeout(()=>go(180,0.15,"sawtooth",0.06),80);},
+    login:   ()=>[300,500,700,900].forEach((f,i)=>setTimeout(()=>go(f,0.1,"sine",0.05),i*70)),
+    logout:  ()=>[900,600,400,200].forEach((f,i)=>setTimeout(()=>go(f,0.1,"sine",0.05),i*60)),
+    warn:    ()=>{go(440,0.1,"square",0.09);setTimeout(()=>go(440,0.1,"square",0.09),200);},
+    ping:    ()=>go(1200,0.04,"sine",0.05),
+    move:    ()=>go(500,0.05,"triangle",0.06),
+    success: ()=>{go(700,0.06,"sine",0.06);setTimeout(()=>go(1000,0.1,"sine",0.07),70);},
+  };
+}
+
+// ── Matrix Rain ────────────────────────────────────────────────────────────
+const MatrixRain = memo(function MatrixRain({opacity}) {
+  const ref = useRef(null);
+  useEffect(()=>{
+    const cv=ref.current; if(!cv)return;
+    const cx=cv.getContext("2d");
+    cv.width=window.innerWidth; cv.height=window.innerHeight;
+    const fs=13, cols=Math.floor(cv.width/fs), drops=Array(cols).fill(1);
+    const chars="アイウエオ0123456789ABCDEF◈▸■";
+    let fr, last=0;
+    const draw=(ts)=>{
+      if(ts-last>60){
+        last=ts;
+        cx.fillStyle="rgba(2,12,4,0.05)"; cx.fillRect(0,0,cv.width,cv.height);
+        drops.forEach((y,i)=>{
+          cx.fillStyle=`rgba(0,255,34,${Math.random()*0.05+0.015})`;
+          cx.font=`${fs}px monospace`;
+          cx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,y*fs);
+          if(y*fs>cv.height&&Math.random()>0.975)drops[i]=0;
+          drops[i]++;
+        });
+      }
+      fr=requestAnimationFrame(draw);
+    };
+    fr=requestAnimationFrame(draw);
+    return ()=>cancelAnimationFrame(fr);
+  },[]);
+  return <canvas ref={ref} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:0,opacity:opacity||0.4}} />;
+});
+
+// ── PC Card ────────────────────────────────────────────────────────────────
+const PCCard = memo(function PCCard({pc,onEdit,onDragStart,onDrop,selected,onSelect,canEdit,snd}) {
+  const [hov,setHov] = useState(false);
+  const sc = SC[pc.status]||"#00ff22";
+  const alert = pc.alerts&&pc.alerts.length>0;
+  return (
+    <div
+      draggable={canEdit}
+      onDragStart={e=>{if(canEdit){onDragStart(e,pc);snd.move();}}}
+      onDragOver={e=>e.preventDefault()}
+      onDrop={e=>onDrop(e,pc)}
+      onMouseEnter={()=>setHov(true)}
+      onMouseLeave={()=>setHov(false)}
+      style={{
+        width:82,minWidth:82,height:96,flexShrink:0,
+        background:selected?"#001520":hov?(pc.status==="ACTIVO"?"#0a1f0a":"#1a0a0a"):"#050f05",
+        border:`1px solid ${selected?"#00aaff":alert?"#ff8800":hov?sc:sc+"28"}`,
+        borderRadius:6,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        cursor:canEdit?"grab":"pointer",transition:"border 0.12s,background 0.12s",
+        position:"relative",userSelect:"none",
+        boxShadow:hov?`0 0 10px ${sc}20`:selected?"0 0 8px #00aaff25":"none",
+      }}
+    >
+      <div style={{position:"absolute",top:4,right:5,width:6,height:6,borderRadius:"50%",background:sc,boxShadow:`0 0 4px ${sc}`,animation:pc.status==="ACTIVO"?"ledPulse 2s infinite":"none"}} />
+      {alert && <div style={{position:"absolute",top:4,left:4,background:"#ff8800",color:"#000",fontSize:7,fontWeight:700,padding:"1px 4px",borderRadius:2}}>!</div>}
+      {pc.status!=="ACTIVO" && (
+        <div style={{position:"absolute",top:4,left:alert?14:4,fontSize:6,color:sc,padding:"1px 4px",borderRadius:2,border:`1px solid ${sc}30`,background:sc+"12"}}>
+          {pc.status==="MANTENIMIENTO"?"MANT":pc.status==="BAJA"?"BAJA":"REMP"}
+        </div>
+      )}
+      <div onClick={e=>{e.stopPropagation();onSelect(pc.id);snd.click();}}
+        style={{position:"absolute",bottom:4,right:4,width:10,height:10,borderRadius:2,border:`1px solid ${selected?"#00aaff":"#2a2a2a"}`,background:selected?"#00aaff":"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#000"}}>
+        {selected?"✓":""}
+      </div>
+      <svg viewBox="0 0 44 38" width="36" height="30" fill="none">
+        <rect x="3" y="3" width="38" height="24" rx="2.5" fill={pc.status==="ACTIVO"?"#061a06":"#100608"} stroke={sc} strokeWidth="1.4" opacity="0.9"/>
+        <rect x="6" y="6" width="32" height="18" rx="1" fill="#020a02" stroke={sc} strokeWidth="0.5" opacity="0.6"/>
+        {pc.status==="ACTIVO"
+          ? <rect x="7" y="7.5" width={Math.max(1,(pc.cpu||0)*0.3)} height="3" rx="0.5" fill={pc.cpu>80?"#ff2222":pc.cpu>50?"#ffff00":"#00ff22"} opacity="0.8"/>
+          : <text x="22" y="18" textAnchor="middle" fill={sc} fontSize="6" fontFamily="monospace" opacity="0.65">{pc.status==="MANTENIMIENTO"?"MANT":pc.status==="BAJA"?"BAJA":"REMP"}</text>
+        }
+        <rect x="18" y="27" width="8" height="3" rx="0.5" fill={sc} opacity="0.28"/>
+        <circle cx="22" cy="28.5" r="0.9" fill={sc} opacity={pc.status==="ACTIVO"?0.85:0.25}/>
+      </svg>
+      <div style={{fontSize:8,color:sc,marginTop:2,maxWidth:78,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"center"}}>{pc.name}</div>
+      <div style={{fontSize:7,color:"#0a2",opacity:0.45,maxWidth:78,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{pc.ip}</div>
+      {pc.status==="ACTIVO"&&pc.ping&&<span style={{fontSize:7,color:pc.ping<20?"#00ff22":pc.ping<50?"#ffff00":"#ff8800"}}>{pc.ping}ms</span>}
+      {hov&&(
+        <div onClick={()=>{onEdit(pc);snd.click();}} style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.83)",border:`1px solid ${sc}`,borderRadius:6,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,cursor:"pointer"}}>
+          <span style={{fontSize:10,color:sc,letterSpacing:2}}>{canEdit?"✎ EDITAR":"👁 VER"}</span>
+          <span style={{fontSize:7,color:sc,opacity:0.55}}>{pc.dept}</span>
+          {pc.user&&<span style={{fontSize:7,color:"#0a2",opacity:0.65}}>{pc.user}</span>}
+        </div>
+      )}
+    </div>
+  );
+}, (a,b)=>a.pc.id===b.pc.id&&a.pc.status===b.pc.status&&a.pc.cpu===b.pc.cpu&&a.pc.ping===b.pc.ping&&((a.pc.alerts&&a.pc.alerts.length)===(b.pc.alerts&&b.pc.alerts.length))&&a.selected===b.selected);
+
+// ── Grid Row with pagination ───────────────────────────────────────────────
+const GridRow = memo(function GridRow({row,rIdx,perms,selIds,onEdit,onDragStart,onDrop,onSel,onAddPC,onDelRow,onRowPwr,snd}) {
+  const [page,setPage] = useState(0);
+  const total = Math.ceil(row.pcs.length/PAGE);
+  const shown = useMemo(()=>row.pcs.slice(page*PAGE,(page+1)*PAGE),[row.pcs,page]);
+  const onPct = useMemo(()=>Math.round(row.pcs.filter(p=>p.status==="ACTIVO").length/Math.max(row.pcs.length,1)*100),[row.pcs]);
+  const tb = {padding:"2px 9px",background:"transparent",fontFamily:"monospace",fontSize:8,letterSpacing:2,cursor:"pointer",borderRadius:3,transition:"all 0.12s"};
+  return (
+    <div style={{marginBottom:12,background:"rgba(3,14,5,0.88)",border:"1px solid #00ff2213",borderRadius:8,padding:"10px 14px"}}>
+      <div style={{display:"flex",alignItems:"center",marginBottom:8,gap:8,flexWrap:"wrap"}}>
+        <span style={{fontFamily:"monospace",fontSize:10,letterSpacing:3,color:"#00ff22",flexShrink:0}}>▸ {row.label.toUpperCase()}</span>
+        <span style={{fontSize:7,opacity:0.3}}>{row.pcs.filter(p=>p.status==="ACTIVO").length}/{row.pcs.length}</span>
+        <div style={{width:48,height:3,background:"#0a100a",borderRadius:2,overflow:"hidden",flexShrink:0}}>
+          <div style={{height:"100%",width:`${onPct}%`,background:"linear-gradient(90deg,#0a2,#00ff22)",transition:"width 0.5s"}}/>
+        </div>
+        {total>1&&(
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0} style={{...tb,border:"1px solid #00ff2220",color:page===0?"#333":"#00ff22"}}>◀</button>
+            <span style={{fontSize:8,color:"#00ff22",opacity:0.4,minWidth:70,textAlign:"center"}}>{page+1}/{total} · {row.pcs.length} PCs</span>
+            <button onClick={()=>setPage(p=>Math.min(total-1,p+1))} disabled={page===total-1} style={{...tb,border:"1px solid #00ff2220",color:page===total-1?"#333":"#00ff22"}}>▶</button>
+          </div>
+        )}
+        <div style={{flex:1}}/>
+        {perms.edit&&<>
+          <button onClick={()=>{onRowPwr(rIdx,"ACTIVO");snd.click();}} style={{...tb,border:"1px solid #00ff2212",color:"#00ff2245"}} onMouseOver={e=>{e.target.style.borderColor="#00ff22";e.target.style.color="#00ff22";}} onMouseOut={e=>{e.target.style.borderColor="#00ff2212";e.target.style.color="#00ff2245";}}>▸ ON</button>
+          <button onClick={()=>{onRowPwr(rIdx,"MANTENIMIENTO");snd.click();}} style={{...tb,border:"1px solid #ffff0012",color:"#ffff0040"}} onMouseOver={e=>{e.target.style.borderColor="#ffff00";e.target.style.color="#ffff00";}} onMouseOut={e=>{e.target.style.borderColor="#ffff0012";e.target.style.color="#ffff0040";}}>🔧</button>
+        </>}
+        {perms.delRow&&<button onClick={()=>{onDelRow(row.id);snd.del();}} style={{...tb,border:"1px solid #ff222212",color:"#ff222235"}} onMouseOver={e=>{e.target.style.borderColor="#ff2222";e.target.style.color="#ff2222";}} onMouseOut={e=>{e.target.style.borderColor="#ff222212";e.target.style.color="#ff222235";}}>✕</button>}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {shown.map(pc=>(
+          <PCCard key={pc.id} pc={pc} onEdit={onEdit} onDragStart={onDragStart} onDrop={onDrop} selected={selIds.has(pc.id)} onSelect={onSel} canEdit={perms.edit} snd={snd}/>
+        ))}
+        {perms.add&&page===total-1&&(
+          <div onClick={()=>onAddPC(row.id)} style={{width:82,minWidth:82,height:96,flexShrink:0,borderRadius:6,border:"1.5px dashed #1a3a1a",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#1a4a1a",fontSize:24,background:"transparent",transition:"all 0.12s"}}
+            onMouseOver={e=>{e.currentTarget.style.borderColor="#00ff22";e.currentTarget.style.color="#00ff22";e.currentTarget.style.background="#00ff2208";}}
+            onMouseOut={e=>{e.currentTarget.style.borderColor="#1a3a1a";e.currentTarget.style.color="#1a4a1a";e.currentTarget.style.background="transparent";}}>+</div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ── Modals ─────────────────────────────────────────────────────────────────
+function HistModal({pc,onClose}) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,8,2,0.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#030e05",border:"1px solid #00ff2228",borderRadius:10,padding:"24px",width:500,maxHeight:"78vh",display:"flex",flexDirection:"column",fontFamily:"monospace",color:"#00ff22"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:13,letterSpacing:3,fontWeight:700}}>◈ HISTORIAL — {pc.name}</div>
+            <div style={{fontSize:7,opacity:0.3,marginTop:2}}>{pc.history.length} CAMBIOS</div>
+          </div>
+          <button onClick={onClose} style={{background:"transparent",border:"1px solid #333",color:"#555",fontFamily:"inherit",fontSize:9,padding:"4px 12px",cursor:"pointer",borderRadius:4}}>✕</button>
+        </div>
+        <div style={{padding:"10px 12px",background:"#020c04",border:"1px solid #00ff2212",borderRadius:6,marginBottom:12}}>
+          <div style={{fontSize:7,opacity:0.3,marginBottom:8,letterSpacing:2}}>ESTADO ACTUAL</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+            {[["IP",pc.ip],["USUARIO",pc.user||"—"],["DPTO",pc.dept],["ESTADO",pc.status],["SO",pc.os]].map(([l,v])=>(
+              <div key={l}>
+                <div style={{fontSize:7,opacity:0.3,marginBottom:2}}>{l}</div>
+                <div style={{fontSize:9,color:l==="ESTADO"?SC[v]:"#00ff22"}}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{flex:1,overflowY:"auto"}}>
+          {pc.history.length===0
+            ? <div style={{textAlign:"center",padding:"28px",opacity:0.2,fontSize:10,letterSpacing:2}}>SIN CAMBIOS REGISTRADOS</div>
+            : [...pc.history].reverse().map((h,i)=>(
+              <div key={i} style={{display:"flex",gap:10,marginBottom:8,padding:"8px 10px",background:"#020c04",border:"1px solid #00ff2210",borderRadius:4}}>
+                <div style={{width:26,height:26,borderRadius:"50%",background:RC[h.role]+"18",border:`1px solid ${RC[h.role]}35`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:RC[h.role],fontWeight:700,flexShrink:0}}>{h.avatar}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:9}}>{h.user}</span>
+                    <span style={{fontSize:7,opacity:0.3}}>{h.at}</span>
+                  </div>
+                  <div style={{fontSize:8,color:RC[h.role],letterSpacing:1,marginBottom:3}}>{h.action}</div>
+                  {h.changes&&h.changes.map((ch,j)=>(
+                    <div key={j} style={{fontSize:7,opacity:0.5,marginBottom:1}}>▸ {ch.field}: <span style={{color:"#ff2222"}}>{ch.from}</span> → <span style={{color:"#00ff22"}}>{ch.to}</span></div>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BajaModal({pc,onClose,onConfirm}) {
+  const [reason,setReason] = useState(BAJA_WHY[0]);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,4,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#0d0000",border:"1px solid #ff2222",borderRadius:10,padding:"28px 32px",width:360,fontFamily:"monospace",color:"#ff2222"}}>
+        <div style={{fontSize:13,letterSpacing:3,fontWeight:700,marginBottom:6}}>⚠ DAR DE BAJA</div>
+        <div style={{fontSize:8,opacity:0.4,marginBottom:18}}>{pc.name} · {pc.ip}</div>
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:0.4,marginBottom:6}}>MOTIVO</div>
+          <select value={reason} onChange={e=>setReason(e.target.value)} style={{background:"#1a0000",border:"1px solid #ff222235",color:"#ff2222",fontFamily:"inherit",fontSize:12,padding:"8px 10px",width:"100%",borderRadius:4,outline:"none"}}>
+            {BAJA_WHY.map(r=><option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>onConfirm(reason)} style={{flex:2,padding:"9px",background:"#2a0000",border:"1px solid #ff2222",color:"#ff2222",fontFamily:"inherit",fontSize:9,letterSpacing:3,cursor:"pointer",borderRadius:4}}>CONFIRMAR</button>
+          <button onClick={onClose} style={{flex:1,padding:"9px",background:"transparent",border:"1px solid #333",color:"#555",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:4}}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PCModal({pc,onClose,onSave,onDelete,onBaja,onHist,cu,snd}) {
+  const [d,setD] = useState({...pc});
+  const p = PERMS[cu.role];
+  const set = (k,v) => setD(x=>({...x,[k]:v}));
+  const inp = {background:"#0a180a",border:"1px solid #00ff2218",color:"#00ff22",fontFamily:"monospace",fontSize:11,padding:"6px 9px",width:"100%",borderRadius:4,outline:"none",boxSizing:"border-box"};
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,8,2,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#030e05",border:"1px solid #00ff2228",borderRadius:10,padding:"24px 28px",width:440,maxHeight:"88vh",overflowY:"auto",fontFamily:"monospace",color:"#00ff22"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,paddingBottom:12,borderBottom:"1px solid #00ff2210"}}>
+          <div>
+            <div style={{fontSize:13,letterSpacing:3,fontWeight:700}}>◈ {d.name}</div>
+            <div style={{fontSize:7,opacity:0.3,marginTop:2}}>POR {(d.addedBy||"system").toUpperCase()}</div>
+          </div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <div style={{padding:"3px 8px",background:SC[d.status]+"15",border:`1px solid ${SC[d.status]}35`,borderRadius:3,fontSize:8,color:SC[d.status],letterSpacing:2}}>{d.status}</div>
+            <button onClick={()=>onHist(pc)} style={{padding:"3px 8px",background:"transparent",border:"1px solid #00aaff28",color:"#00aaff",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3}}>📋</button>
+          </div>
+        </div>
+        {!p.edit&&<div style={{padding:"8px 10px",background:"#001a00",border:"1px solid #00ff2215",borderRadius:4,marginBottom:12,fontSize:8,color:"#00ff22",opacity:0.55}}>👁 SOLO LECTURA · {cu.role}</div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+          {[["NOMBRE",d.name,"name"],["IP",d.ip,"ip"],["USUARIO",d.user||"","user"],["DPTO",d.dept,"dept"],["SISTEMA",d.os,"os"],["UPTIME",d.uptime,"uptime"]].map(([label,val,key])=>(
+            <div key={key}>
+              <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:3}}>{label}</div>
+              <input value={val||""} onChange={e=>set(key,e.target.value)} disabled={!p.edit} style={{...inp,opacity:p.edit?1:0.55,cursor:p.edit?"text":"not-allowed"}} onFocus={e=>p.edit&&(e.target.style.borderColor="#00ff22")} onBlur={e=>(e.target.style.borderColor="#00ff2218")}/>
+            </div>
+          ))}
+        </div>
+        {p.edit&&(
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:7}}>ESTADO</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {STATUSES.map(s=>(
+                <button key={s} onClick={()=>set("status",s)} style={{padding:"5px 10px",flex:1,background:d.status===s?SC[s]+"15":"transparent",border:`1px solid ${d.status===s?SC[s]:SC[s]+"22"}`,color:d.status===s?SC[s]:SC[s]+"55",fontFamily:"inherit",fontSize:7,letterSpacing:1,cursor:"pointer",borderRadius:3,transition:"all 0.15s"}}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {d.status==="ACTIVO"&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            {[["CPU %",d.cpu,"cpu"],["RAM %",d.ram,"ram"]].map(([l,v,k])=>(
+              <div key={k}>
+                <div style={{fontSize:7,letterSpacing:1,opacity:0.35,marginBottom:3}}>{l} <span style={{color:v>80?"#ff2222":v>50?"#ffff00":"#00ff22"}}>{v}%</span></div>
+                <input type="range" min="0" max="100" value={v} onChange={e=>set(k,+e.target.value)} disabled={!p.edit} style={{width:"100%",accentColor:"#00ff22",cursor:p.edit?"pointer":"not-allowed"}}/>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{display:"flex",gap:7}}>
+          {p.edit&&<button onClick={()=>{onSave(d);snd.save();}} style={{flex:2,padding:"9px",background:"#0a1a0a",border:"1px solid #00ff22",color:"#00ff22",fontFamily:"inherit",fontSize:9,letterSpacing:3,cursor:"pointer",borderRadius:4}} onMouseOver={e=>e.target.style.background="#0f2210"} onMouseOut={e=>e.target.style.background="#0a1a0a"}>💾 GUARDAR</button>}
+          {p.edit&&d.status!=="BAJA"&&<button onClick={()=>onBaja(pc)} style={{flex:1,padding:"9px",background:"#1a0000",border:"1px solid #ff222235",color:"#ff2222",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:4}}>⬇ BAJA</button>}
+          {p.del&&<button onClick={()=>{onDelete(pc.id);snd.del();}} style={{flex:1,padding:"9px",background:"#1a0000",border:"1px solid #ff2222",color:"#ff2222",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:4}}>✕</button>}
+          <button onClick={onClose} style={{flex:1,padding:"9px",background:"#0d0d0d",border:"1px solid #333",color:"#555",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:4}}>ESC</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddModal({onClose,onAdd}) {
+  const [qty,setQty] = useState(1);
+  const [pcs,setPcs] = useState(20);
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,8,2,0.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#030e05",border:"1px solid #00ff2228",borderRadius:10,padding:"28px 32px",width:360,fontFamily:"monospace",color:"#00ff22"}}>
+        <div style={{fontSize:13,letterSpacing:3,fontWeight:700,marginBottom:20}}>◈ AGREGAR FILAS</div>
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:6}}>FILAS: <span style={{fontSize:16,fontWeight:700,color:"#00ff22"}}>{qty}</span></div>
+          <input type="range" min="1" max="20" value={qty} onChange={e=>setQty(+e.target.value)} style={{width:"100%",accentColor:"#00ff22"}}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:0.35,marginBottom:6}}>PCs POR FILA: <span style={{fontSize:16,fontWeight:700,color:"#00ff22"}}>{pcs}</span></div>
+          <input type="range" min="5" max="100" step="5" value={pcs} onChange={e=>setPcs(+e.target.value)} style={{width:"100%",accentColor:"#00ff22"}}/>
+        </div>
+        <div style={{padding:"10px",background:"#020c04",border:"1px solid #00ff2215",borderRadius:5,marginBottom:18,textAlign:"center"}}>
+          <span style={{fontSize:10,opacity:0.6}}>Se crearán </span>
+          <span style={{fontSize:16,fontWeight:700,color:"#00ff22"}}>{qty*pcs}</span>
+          <span style={{fontSize:10,opacity:0.6}}> equipos</span>
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>onAdd(qty,pcs)} style={{flex:2,padding:"10px",background:"#0a1a0a",border:"1px solid #00ff22",color:"#00ff22",fontFamily:"inherit",fontSize:10,letterSpacing:3,cursor:"pointer",borderRadius:4}} onMouseOver={e=>e.target.style.background="#0f2210"} onMouseOut={e=>e.target.style.background="#0a1a0a"}>✓ CREAR</button>
+          <button onClick={onClose} style={{flex:1,padding:"10px",background:"transparent",border:"1px solid #333",color:"#555",fontFamily:"inherit",fontSize:10,cursor:"pointer",borderRadius:4}}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Login({onLogin,snd}) {
+  const [user,setUser] = useState("");
+  const [pass,setPass] = useState("");
+  const [err,setErr] = useState("");
+  const [load,setLoad] = useState(false);
+  const go = () => {
+    const acc = ACCOUNTS.find(a=>a.username===user&&a.password===pass);
+    if(!acc){setErr("CREDENCIALES INVÁLIDAS");snd.warn();return;}
+    setLoad(true);setErr("");
+    setTimeout(()=>{snd.login();onLogin(acc);},800);
+  };
+  const inp = {background:"#050f05",border:"1px solid #00ff2220",color:"#00ff22",fontFamily:"monospace",fontSize:12,padding:"11px 13px",width:"100%",borderRadius:4,outline:"none",letterSpacing:2};
+  return (
+    <div style={{position:"fixed",inset:0,background:"#020c04",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
+      <MatrixRain opacity={0.65}/>
+      <div style={{position:"relative",zIndex:10,width:400}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <div style={{fontFamily:"monospace",fontSize:30,fontWeight:900,letterSpacing:8,color:"#00ff22",textShadow:"0 0 30px #00ff22"}}>◈ NETGRID</div>
+          <div style={{fontSize:8,letterSpacing:5,color:"#00ff22",opacity:0.35,marginTop:4}}>NETWORK ADMIN v5.0</div>
+        </div>
+        <div style={{background:"rgba(3,14,5,0.97)",border:"1px solid #00ff2220",borderRadius:12,padding:"32px 36px",backdropFilter:"blur(10px)"}}>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:0.35,marginBottom:6}}>USUARIO</div>
+            <input value={user} onChange={e=>setUser(e.target.value)} style={inp} placeholder="usuario" onKeyDown={e=>e.key==="Enter"&&go()} onFocus={e=>e.target.style.borderColor="#00ff22"} onBlur={e=>e.target.style.borderColor="#00ff2220"}/>
+          </div>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:0.35,marginBottom:6}}>CONTRASEÑA</div>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} style={inp} placeholder="••••••••" onKeyDown={e=>e.key==="Enter"&&go()} onFocus={e=>e.target.style.borderColor="#00ff22"} onBlur={e=>e.target.style.borderColor="#00ff2220"}/>
+          </div>
+          {err&&<div style={{fontSize:9,color:"#ff2222",letterSpacing:2,marginBottom:10,textAlign:"center"}}>{err}</div>}
+          <button onClick={go} disabled={load} style={{width:"100%",padding:"12px",marginTop:12,background:"#0a1a0a",border:"1px solid #00ff22",color:"#00ff22",fontFamily:"monospace",fontSize:10,letterSpacing:4,cursor:load?"wait":"pointer",borderRadius:4,transition:"all 0.2s"}} onMouseOver={e=>e.target.style.background="#0f2210"} onMouseOut={e=>e.target.style.background="#0a1a0a"}>
+            {load?"↻ VERIFICANDO...":"▶ INICIAR SESIÓN"}
+          </button>
+          <div style={{marginTop:20,padding:"10px",background:"#020c04",border:"1px solid #00ff2210",borderRadius:5}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:0.25,marginBottom:7}}>CUENTAS DEMO</div>
+            {ACCOUNTS.map(a=>(
+              <div key={a.id} onClick={()=>{setUser(a.username);setPass(a.password);snd.click();}} style={{display:"flex",justifyContent:"space-between",padding:"4px 7px",marginBottom:2,borderRadius:3,cursor:"pointer",transition:"all 0.12s"}} onMouseOver={e=>e.currentTarget.style.background="#00ff2208"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
+                <span style={{fontSize:8,color:"#00ff22",opacity:0.55}}>{a.username}</span>
+                <span style={{fontSize:8,color:RC[a.role],letterSpacing:2}}>{a.role}</span>
+                <span style={{fontSize:8,color:"#00ff22",opacity:0.25}}>{a.password}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN ───────────────────────────────────────────────────────────────────
+function App() {
+  const [cu,setCu] = useState(null);
+  const [rows,setRows] = useState(()=>mkRows(3,20));
+  const [editPC,setEditPC] = useState(null);
+  const [histPC,setHistPC] = useState(null);
+  const [bajaPC,setBajaPC] = useState(null);
+  const [showAdd,setShowAdd] = useState(false);
+  const [drag,setDrag] = useState(null);
+  const [toast,setToast] = useState(null);
+  const [logs,setLogs] = useState([{t:nowT(),msg:"Sistema iniciado",type:"ok"}]);
+  const [search,setSearch] = useState("");
+  const [filter,setFilter] = useState("ALL");
+  const [sfilt,setSfilt] = useState("ALL");
+  const [panel,setPanel] = useState("LOGS");
+  const [pinging,setPinging] = useState(false);
+  const [selIds,setSelIds] = useState(new Set());
+  const [time,setTime] = useState(nowT());
+  const toastRef = useRef(null);
+  const snd = useSound();
+
+  useEffect(()=>{const t=setInterval(()=>setTime(nowT()),1000);return()=>clearInterval(t);},[]);
+
+  useEffect(()=>{
+    let idx=0;
+    const t=setInterval(()=>{
+      setRows(prev=>{
+        if(!prev.length)return prev;
+        const ri=idx%prev.length; idx++;
+        const next=[...prev];
+        next[ri]={...next[ri],pcs:next[ri].pcs.map(pc=>{
+          if(pc.status!=="ACTIVO")return pc;
+          return{...pc,ping:rndPing(),cpu:Math.min(100,Math.max(1,(pc.cpu+(Math.random()*8-4))|0)),ram:Math.min(100,Math.max(1,(pc.ram+(Math.random()*5-2))|0))};
+        })};
+        return next;
+      });
+    },800);
+    return()=>clearInterval(t);
+  },[]);
+
+  const addLog = useCallback((msg,type="ok")=>setLogs(p=>[{t:nowT(),msg,type},...p.slice(0,79)]),[]);
+  const toast2 = useCallback((msg,type="ok")=>{
+    if(toastRef.current)clearTimeout(toastRef.current);
+    setToast({msg,type});
+    toastRef.current=setTimeout(()=>setToast(null),2500);
+  },[]);
+
+  const allPCs = useMemo(()=>rows.flatMap(r=>r.pcs),[rows]);
+  const stats = useMemo(()=>{
+    const on=allPCs.filter(p=>p.status==="ACTIVO");
+    const wp=allPCs.filter(p=>p.ping);
+    return {
+      total:allPCs.length, active:on.length,
+      maint:allPCs.filter(p=>p.status==="MANTENIMIENTO").length,
+      baja:allPCs.filter(p=>p.status==="BAJA").length,
+      alerts:allPCs.filter(p=>p.alerts&&p.alerts.length>0).length,
+      avgPing:wp.length?Math.round(wp.reduce((a,p)=>a+p.ping,0)/wp.length):0,
+      avgCPU:on.length?Math.round(on.reduce((a,p)=>a+p.cpu,0)/on.length):0,
+      avgRAM:on.length?Math.round(on.reduce((a,p)=>a+p.ram,0)/on.length):0,
+    };
+  },[allPCs]);
+  const pct = useMemo(()=>Math.round(stats.active/Math.max(stats.total,1)*100),[stats]);
+  const perms = useMemo(()=>cu?PERMS[cu.role]:{},[cu]);
+
+  const filtRows = useMemo(()=>{
+    const has=search||filter!=="ALL"||sfilt!=="ALL";
+    if(!has)return rows;
+    return rows.map(row=>({...row,pcs:row.pcs.filter(pc=>{
+      if(filter==="ONLINE"&&pc.status!=="ACTIVO")return false;
+      if(filter==="OFFLINE"&&pc.status==="ACTIVO")return false;
+      if(filter==="ALERT"&&!(pc.alerts&&pc.alerts.length))return false;
+      if(sfilt!=="ALL"&&pc.status!==sfilt)return false;
+      if(search){const s=search.toLowerCase();if(!pc.name.toLowerCase().includes(s)&&!pc.ip.includes(s)&&!(pc.user||"").toLowerCase().includes(s))return false;}
+      return true;
+    })})).filter(r=>r.pcs.length>0);
+  },[rows,search,filter,sfilt]);
+
+  const handleLogin=useCallback(acc=>{setCu(acc);addLog(`${acc.name} inició sesión [${acc.role}]`,"ok");toast2(`Bienvenido, ${acc.name}`);},[addLog,toast2]);
+  const handleLogout=useCallback(()=>{addLog(`${cu.name} cerró sesión`,"warn");snd.logout();setCu(null);},[cu,addLog,snd]);
+
+  const handleSave=useCallback(upd=>{
+    const old=allPCs.find(p=>p.id===upd.id);
+    const ch=[];
+    if(old.name!==upd.name)ch.push({field:"Nombre",from:old.name,to:upd.name});
+    if(old.ip!==upd.ip)ch.push({field:"IP",from:old.ip,to:upd.ip});
+    if(old.status!==upd.status)ch.push({field:"Estado",from:old.status,to:upd.status});
+    if(old.user!==upd.user)ch.push({field:"Usuario",from:old.user||"—",to:upd.user||"—"});
+    const entry=ch.length>0?{action:"EDITADO",changes:ch,user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}:null;
+    const final=entry?{...upd,history:[...upd.history,entry]}:upd;
+    setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(pc=>pc.id===upd.id?final:pc)})));
+    setEditPC(null);
+    if(entry)addLog(`${cu.name} editó ${upd.name}`,"ok");
+    toast2(`${upd.name} guardado`);
+  },[allPCs,cu,addLog,toast2]);
+
+  const handleDelete=useCallback(id=>{
+    const pc=allPCs.find(p=>p.id===id);
+    setRows(p=>p.map(row=>({...row,pcs:row.pcs.filter(pc=>pc.id!==id)})));
+    setEditPC(null);
+    addLog(`${cu.name} ELIMINÓ ${pc?pc.name:id}`,"warn");toast2("Eliminado","warn");snd.del();
+  },[allPCs,cu,addLog,toast2,snd]);
+
+  const handleBaja=useCallback(reason=>{
+    const pc=bajaPC;
+    const entry={action:`BAJA: ${reason}`,changes:[{field:"Estado",from:pc.status,to:"BAJA"},{field:"Motivo",from:"—",to:reason}],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()};
+    setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(p2=>p2.id===pc.id?{...p2,status:"BAJA",ping:null,bajaReason:reason,history:[...p2.history,entry]}:p2)})));
+    setBajaPC(null);setEditPC(null);
+    addLog(`${cu.name} BAJA ${pc.name}: ${reason}`,"warn");toast2(`${pc.name} baja`,"warn");snd.warn();
+  },[bajaPC,cu,addLog,toast2,snd]);
+
+  const handleAddRows=useCallback((qty,pcsPerRow)=>{
+    setRows(prev=>{
+      const start=prev.length;
+      return [...prev,...Array.from({length:qty},(_,ri)=>({
+        id:uid(),label:`Fila ${start+ri+1}`,
+        pcs:Array.from({length:pcsPerRow},(_,c)=>({...mkPC(start+ri,c),addedBy:cu.username,addedAt:new Date().toISOString(),history:[{action:"CREADO",changes:[],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}]})),
+      }))];
+    });
+    setShowAdd(false);
+    addLog(`${cu.name} creó ${qty} fila(s) × ${pcsPerRow} = ${qty*pcsPerRow} PCs`,"ok");
+    toast2(`${qty*pcsPerRow} equipos creados`);snd.success();
+  },[cu,addLog,toast2,snd]);
+
+  const handleAddPC=useCallback(rowId=>{
+    setRows(prev=>{
+      const ri=prev.findIndex(r=>r.id===rowId),ci=prev[ri].pcs.length;
+      const npc={...mkPC(ri,ci),id:uid(),name:`PC-${String(ri+1).padStart(2,"0")}${String(ci+1).padStart(2,"0")}`,ip:`192.168.${ri+1}.${ci+1}`,addedBy:cu.username,addedAt:new Date().toISOString(),history:[{action:"AGREGADO",changes:[],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}]};
+      return prev.map((r,i)=>i===ri?{...r,pcs:[...r.pcs,npc]}:r);
+    });
+    addLog(`${cu.name} agregó PC`,"ok");toast2("PC agregado");snd.success();
+  },[cu,addLog,toast2,snd]);
+
+  const handleDelRow=useCallback(rowId=>{
+    const row=rows.find(r=>r.id===rowId);
+    setRows(p=>p.filter(r=>r.id!==rowId));
+    addLog(`${cu.name} eliminó ${row?row.label:rowId}`,"warn");toast2("Fila eliminada","warn");snd.del();
+  },[rows,cu,addLog,toast2,snd]);
+
+  const handleRowPwr=useCallback((rIdx,status)=>{
+    setRows(p=>p.map((r,i)=>i===rIdx?{...r,pcs:r.pcs.map(pc=>({...pc,status,ping:status==="ACTIVO"?rndPing():null}))}:r));
+    addLog(`${cu.name}: Fila ${rIdx+1} → ${status}`,"ok");snd.click();
+  },[cu,addLog,snd]);
+
+  const handlePingAll=useCallback(()=>{
+    setPinging(true);addLog(`${cu.name} ping masivo`,"ok");snd.ping();
+    setTimeout(()=>{
+      setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(pc=>pc.status==="ACTIVO"?{...pc,ping:rndPing()}:pc)})));
+      addLog(`Ping OK: ${stats.active}/${stats.total}`,"ok");toast2("Ping completado");snd.success();setPinging(false);
+    },1400);
+  },[cu,stats,addLog,toast2,snd]);
+
+  const handleDragStart=useCallback((e,pc)=>{setDrag(pc);e.dataTransfer.effectAllowed="move";},[]);
+  const handleDrop=useCallback((e,target)=>{
+    e.preventDefault();if(!drag||drag.id===target.id)return;
+    setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(pc=>{
+      if(pc.id===drag.id)return{...pc,name:target.name,ip:target.ip,status:target.status,user:target.user,ping:target.ping,cpu:target.cpu,ram:target.ram};
+      if(pc.id===target.id)return{...pc,name:drag.name,ip:drag.ip,status:drag.status,user:drag.user,ping:drag.ping,cpu:drag.cpu,ram:drag.ram};
+      return pc;
+    })})));
+    addLog(`${cu.name} movió ${drag.name}↔${target.name}`,"ok");snd.move();setDrag(null);
+  },[drag,cu,addLog,snd]);
+
+  const toggleSel=useCallback(id=>{snd.click();setSelIds(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});},[snd]);
+
+  if(!cu)return <Login onLogin={handleLogin} snd={snd}/>;
+
+  const fb=(act,col)=>({padding:"4px 10px",background:act?col+"15":"transparent",border:`1px solid ${act?col+"70":col+"25"}`,color:act?col:col+"50",fontFamily:"monospace",fontSize:8,letterSpacing:2,cursor:"pointer",borderRadius:3,transition:"all 0.12s"});
+
+  return (
+    <div style={{height:"100vh",display:"flex",flexDirection:"column",background:"#020c04",fontFamily:"monospace",color:"#00ff22",overflow:"hidden",position:"relative"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-track{background:#020c04}
+        ::-webkit-scrollbar-thumb{background:#00ff2222;border-radius:3px}
+        input[type=range]{-webkit-appearance:none;background:transparent;height:18px}
+        input[type=range]::-webkit-slider-runnable-track{background:#00ff2218;height:3px;border-radius:2px}
+        input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;background:#00ff22;border-radius:50%;margin-top:-4px;cursor:pointer}
+        select option{background:#030e05;color:#00ff22}
+        @keyframes ledPulse{0%,100%{opacity:1}50%{opacity:.28}}
+        @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+        @keyframes fs{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+      `}</style>
+      <MatrixRain opacity={0.35}/>
+
+      {/* TOPBAR */}
+      <div style={{position:"relative",zIndex:10,background:"rgba(2,10,4,0.97)",borderBottom:"1px solid #00ff2212",backdropFilter:"blur(4px)"}}>
+        <div style={{display:"flex",alignItems:"center",padding:"8px 18px",gap:14,flexWrap:"wrap"}}>
+          <div style={{flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:900,letterSpacing:6,color:"#00ff22",textShadow:"0 0 18px #00ff22"}}>◈ NETGRID</div>
+            <div style={{fontSize:7,letterSpacing:4,color:"#00ff22",opacity:0.3}}>NETWORK ADMIN v5.0</div>
+          </div>
+          <div style={{width:1,height:32,background:"#00ff2210",flexShrink:0}}/>
+          <div style={{flexShrink:0,textAlign:"center"}}>
+            <div style={{fontSize:14,letterSpacing:3,color:"#00ff22",fontWeight:700}}>{time}</div>
+            <div style={{fontSize:7,opacity:0.3}}>{new Date().toLocaleDateString("es-MX")}</div>
+          </div>
+          <div style={{width:1,height:32,background:"#00ff2210",flexShrink:0}}/>
+          <div style={{display:"flex",gap:12,flex:1,flexWrap:"wrap"}}>
+            {[{l:"TOTAL",v:stats.total,c:"#00ff22"},{l:"ACTIVOS",v:stats.active,c:"#00ff22"},{l:"MANT",v:stats.maint,c:"#ffff00"},{l:"BAJA",v:stats.baja,c:"#ff2222"},{l:"ALERTAS",v:stats.alerts,c:"#ff8800"},{l:"CPU",v:`${stats.avgCPU}%`,c:stats.avgCPU>80?"#ff2222":"#00ff22"},{l:"RAM",v:`${stats.avgRAM}%`,c:stats.avgRAM>80?"#ff2222":"#00aaff"},{l:"PING",v:`${stats.avgPing}ms`,c:stats.avgPing<30?"#00ff22":"#ffff00"}].map(({l,v,c})=>(
+              <div key={l} style={{textAlign:"center",minWidth:40}}>
+                <div style={{fontSize:6,letterSpacing:1,opacity:0.3,marginBottom:1}}>{l}</div>
+                <div style={{fontSize:13,fontWeight:700,color:c,textShadow:`0 0 5px ${c}`}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{flexShrink:0,minWidth:80}}>
+            <div style={{fontSize:6,opacity:0.3,marginBottom:2,textAlign:"center"}}>DISPONIB.</div>
+            <div style={{height:4,background:"#0a1a0a",borderRadius:2,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#0a2,#00ff22)",transition:"width 0.6s"}}/>
+            </div>
+            <div style={{fontSize:9,textAlign:"center",marginTop:1,color:"#00ff22",fontWeight:700}}>{pct}%</div>
+          </div>
+          <div style={{width:1,height:32,background:"#00ff2210",flexShrink:0}}/>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+            <div style={{width:30,height:30,borderRadius:"50%",background:RC[cu.role]+"18",border:`1.5px solid ${RC[cu.role]}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:RC[cu.role],fontWeight:700}}>{cu.avatar}</div>
+            <div>
+              <div style={{fontSize:9,color:RC[cu.role]}}>{cu.name}</div>
+              <div style={{fontSize:6,opacity:0.35}}>{cu.role} · {cu.dept}</div>
+            </div>
+            <button onClick={handleLogout} style={{padding:"4px 9px",background:"transparent",border:"1px solid #ff222225",color:"#ff222250",fontFamily:"inherit",fontSize:9,cursor:"pointer",borderRadius:3,transition:"all 0.12s"}} onMouseOver={e=>{e.target.style.borderColor="#ff2222";e.target.style.color="#ff2222";}} onMouseOut={e=>{e.target.style.borderColor="#ff222225";e.target.style.color="#ff222250";}}>⏻</button>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",padding:"6px 18px",gap:7,borderTop:"1px solid #00ff2208",flexWrap:"wrap"}}>
+          <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+            <span style={{position:"absolute",left:8,fontSize:10,opacity:0.3,pointerEvents:"none"}}>⌕</span>
+            <input placeholder="PC / IP / USUARIO..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:"#0a160a",border:"1px solid #00ff2215",color:"#00ff22",fontFamily:"inherit",fontSize:9,padding:"5px 9px 5px 26px",borderRadius:4,outline:"none",width:200}} onFocus={e=>e.target.style.borderColor="#00ff22"} onBlur={e=>e.target.style.borderColor="#00ff2215"}/>
+            {search&&<span onClick={()=>setSearch("")} style={{position:"absolute",right:7,cursor:"pointer",opacity:0.4,fontSize:9}}>✕</span>}
+          </div>
+          <div style={{width:1,height:20,background:"#00ff2210"}}/>
+          {[{f:"ALL",l:"TODOS"},{f:"ONLINE",l:"● ON"},{f:"OFFLINE",l:"○ OFF"},{f:"ALERT",l:"⚠"}].map(({f,l})=>(
+            <button key={f} onClick={()=>{setFilter(f);snd.click();}} style={fb(filter===f,"#00ff22")}>{l}</button>
+          ))}
+          <div style={{width:1,height:20,background:"#00ff2210"}}/>
+          {STATUSES.map(s=>(
+            <button key={s} onClick={()=>{setSfilt(p=>p===s?"ALL":s);snd.click();}} style={fb(sfilt===s,SC[s])}>{s}</button>
+          ))}
+          <div style={{width:1,height:20,background:"#00ff2210"}}/>
+          <button onClick={handlePingAll} disabled={pinging} style={{padding:"4px 12px",background:"#0a1a0a",border:"1px solid #00ff2225",color:"#00ff22",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3,display:"flex",alignItems:"center",gap:4}}>
+            <span style={{display:"inline-block",animation:pinging?"spin 0.7s linear infinite":"none"}}>{pinging?"↻":"◎"}</span>PING
+          </button>
+          {perms.add&&<button onClick={()=>{setShowAdd(true);snd.click();}} style={{padding:"4px 12px",background:"#0a1a0a",border:"1px solid #00ff2225",color:"#00ff22",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3}}>+ FILAS</button>}
+          {selIds.size>0&&<>
+            <div style={{width:1,height:20,background:"#00ff2210"}}/>
+            <span style={{fontSize:8,color:"#00aaff"}}>{selIds.size} SEL</span>
+            {perms.edit&&<>
+              <button onClick={()=>{setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(pc=>selIds.has(pc.id)?{...pc,status:"ACTIVO",ping:rndPing()}:pc)})));addLog(`${cu.name} activó ${selIds.size} PCs`,"ok");setSelIds(new Set());snd.success();}} style={fb(false,"#00ff22")}>▶ ON</button>
+              <button onClick={()=>{setRows(p=>p.map(row=>({...row,pcs:row.pcs.map(pc=>selIds.has(pc.id)?{...pc,status:"MANTENIMIENTO",ping:null}:pc)})));addLog(`${cu.name}: ${selIds.size} en MANT`,"ok");setSelIds(new Set());snd.warn();}} style={fb(false,"#ffff00")}>🔧</button>
+            </>}
+            {perms.del&&<button onClick={()=>{setRows(p=>p.map(row=>({...row,pcs:row.pcs.filter(pc=>!selIds.has(pc.id))})));addLog(`${cu.name} eliminó ${selIds.size} PCs`,"warn");setSelIds(new Set());snd.del();}} style={fb(false,"#ff2222")}>✕ DEL</button>}
+            <button onClick={()=>setSelIds(new Set())} style={{padding:"4px 8px",background:"transparent",border:"1px solid #222",color:"#444",fontFamily:"inherit",fontSize:8,cursor:"pointer",borderRadius:3}}>✕</button>
+          </>}
+        </div>
+      </div>
+
+      {/* BODY */}
+      <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative",zIndex:5}}>
+        <div style={{flex:1,overflowY:"auto",overflowX:"hidden",padding:"12px 16px"}}>
+          {filtRows.map(row=>(
+            <GridRow key={row.id} row={row} rIdx={rows.findIndex(r=>r.id===row.id)} perms={perms} selIds={selIds} onEdit={setEditPC} onDragStart={handleDragStart} onDrop={handleDrop} onSel={toggleSel} onAddPC={handleAddPC} onDelRow={handleDelRow} onRowPwr={handleRowPwr} snd={snd}/>
+          ))}
+          {filtRows.length===0&&<div style={{textAlign:"center",padding:"60px 20px",opacity:0.2,fontSize:11,letterSpacing:3}}>{search||filter!=="ALL"||sfilt!=="ALL"?"SIN RESULTADOS":"SIN FILAS — PRESIONA + FILAS"}</div>}
+        </div>
+        <div style={{width:250,borderLeft:"1px solid #00ff2212",background:"rgba(2,10,4,0.96)",display:"flex",flexDirection:"column",flexShrink:0}}>
+          <div style={{display:"flex",borderBottom:"1px solid #00ff2212",flexShrink:0}}>
+            {["LOGS","STATS","MAPA"].map(t=>(
+              <button key={t} onClick={()=>{setPanel(t);snd.click();}} style={{flex:1,padding:"9px 0",background:panel===t?"#00ff2206":"transparent",border:"none",borderBottom:panel===t?"2px solid #00ff22":"2px solid transparent",color:panel===t?"#00ff22":"#00ff2230",fontFamily:"inherit",fontSize:7,letterSpacing:3,cursor:"pointer",transition:"all 0.15s"}}>{t}</button>
+            ))}
+          </div>
+          {panel==="LOGS"&&(
+            <div style={{flex:1,overflowY:"auto",padding:"10px 12px"}}>
+              <div style={{fontSize:6,letterSpacing:3,opacity:0.25,marginBottom:9}}>▸ AUDITORÍA</div>
+              {logs.map((l,i)=>(
+                <div key={i} style={{display:"flex",gap:6,marginBottom:6,opacity:Math.max(0.15,1-i*0.013),animation:i===0?"fs 0.25s ease":"none"}}>
+                  <span style={{color:"#00ff22",opacity:0.25,whiteSpace:"nowrap",flexShrink:0,fontSize:7}}>{l.t}</span>
+                  <span style={{fontSize:8,color:l.type==="warn"?"#ff8800":"#00ff22",wordBreak:"break-word"}}>{l.type==="warn"?"⚠":"▸"} {l.msg}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {panel==="STATS"&&(
+            <div style={{flex:1,overflowY:"auto",padding:"12px"}}>
+              <div style={{fontSize:6,letterSpacing:3,opacity:0.25,marginBottom:12}}>▸ MÉTRICAS</div>
+              {[{l:"DISPONIBILIDAD",v:`${pct}%`,c:"#00ff22",b:pct},{l:"CPU PROM",v:`${stats.avgCPU}%`,c:stats.avgCPU>80?"#ff2222":"#ffff00",b:stats.avgCPU},{l:"RAM PROM",v:`${stats.avgRAM}%`,c:stats.avgRAM>80?"#ff2222":"#00aaff",b:stats.avgRAM},{l:"PING PROM",v:`${stats.avgPing}ms`,c:stats.avgPing<30?"#00ff22":"#ffff00",b:Math.min(100,stats.avgPing)}].map(({l,v,c,b})=>(
+                <div key={l} style={{marginBottom:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                    <span style={{fontSize:7,opacity:0.3}}>{l}</span>
+                    <span style={{fontSize:11,color:c,fontWeight:700}}>{v}</span>
+                  </div>
+                  <div style={{height:3,background:"#0a140a",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${b}%`,background:c,borderRadius:2,transition:"width 0.8s"}}/>
+                  </div>
+                </div>
+              ))}
+              <div style={{marginTop:14,padding:"10px",background:"#020c04",border:"1px solid #00ff2210",borderRadius:5}}>
+                <div style={{fontSize:6,opacity:0.25,marginBottom:9}}>POR ESTADO</div>
+                {STATUSES.map(s=>{const cnt=allPCs.filter(p=>p.status===s).length;const b2=Math.round(cnt/Math.max(allPCs.length,1)*100);return(
+                  <div key={s} style={{marginBottom:7}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                      <span style={{fontSize:7,color:SC[s]}}>{s}</span>
+                      <span style={{fontSize:8,color:SC[s],fontWeight:700}}>{cnt}</span>
+                    </div>
+                    <div style={{height:3,background:"#0a140a",borderRadius:2,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${b2}%`,background:SC[s],transition:"width 0.5s"}}/>
+                    </div>
+                  </div>
+                );})}
+              </div>
+              <div style={{marginTop:12,padding:"10px",background:"#020c04",border:"1px solid #00ff2210",borderRadius:5}}>
+                <div style={{fontSize:6,opacity:0.25,marginBottom:8}}>RENDIMIENTO</div>
+                <div style={{fontSize:8,opacity:0.5,marginBottom:3}}>PCs: <span style={{color:"#00ff22",fontWeight:700}}>{stats.total}</span></div>
+                <div style={{fontSize:8,opacity:0.5,marginBottom:3}}>Filas: <span style={{color:"#00ff22",fontWeight:700}}>{rows.length}</span></div>
+                <div style={{fontSize:8,opacity:0.5}}>Estado: <span style={{color:stats.total>1500?"#ff8800":stats.total>800?"#ffff00":"#00ff22"}}>{stats.total>1500?"ALTA CARGA":stats.total>800?"CARGA MEDIA":"ÓPTIMO"}</span></div>
+              </div>
+            </div>
+          )}
+          {panel==="MAPA"&&(
+            <div style={{flex:1,overflowY:"auto",padding:"12px"}}>
+              <div style={{fontSize:6,letterSpacing:3,opacity:0.25,marginBottom:10}}>▸ MAPA DE RED</div>
+              <div style={{fontSize:7,opacity:0.2,marginBottom:10}}>{stats.total} EQ · {rows.length} FILAS</div>
+              {rows.map(row=>(
+                <div key={row.id} style={{marginBottom:10}}>
+                  <div style={{fontSize:6,opacity:0.25,marginBottom:4}}>{row.label.toUpperCase()} ({row.pcs.length})</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:2}}>
+                    {row.pcs.map(pc=>(
+                      <div key={pc.id} title={`${pc.name}·${pc.ip}·${pc.status}`} onClick={()=>{setEditPC(pc);snd.click();}} style={{width:12,height:12,borderRadius:1,cursor:"pointer",background:SC[pc.status],boxShadow:pc.status==="ACTIVO"?"0 0 3px #00ff22":"none",opacity:pc.status==="ACTIVO"?1:0.45,transition:"all 0.3s"}}/>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div style={{marginTop:10,padding:"8px",background:"#030e05",border:"1px solid #00ff2210",borderRadius:4}}>
+                {STATUSES.map(s=>(
+                  <div key={s} style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
+                    <div style={{width:9,height:9,borderRadius:1,background:SC[s]}}/>
+                    <span style={{fontSize:7,color:SC[s],opacity:0.65}}>{s} ({allPCs.filter(p=>p.status===s).length})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* STATUS BAR */}
+      <div style={{position:"relative",zIndex:10,borderTop:"1px solid #00ff2210",background:"rgba(2,10,4,0.97)",padding:"4px 18px",display:"flex",gap:16,alignItems:"center",fontSize:7,letterSpacing:2,color:"#00ff22",opacity:0.4}}>
+        <span style={{animation:"ledPulse 1.5s infinite"}}>●</span>
+        <span>ACTIVO</span>
+        <span>ROL: <span style={{color:RC[cu.role]}}>{cu.role}</span></span>
+        <span>FILAS: {rows.length}</span>
+        <span>TOTAL: {stats.total}</span>
+        <span>ON: {stats.active}</span>
+        <span>BAJA: <span style={{color:"#ff2222"}}>{stats.baja}</span></span>
+        <div style={{flex:1}}/>
+        <span>PÁG: {PAGE}/FILA</span>
+        {!perms.edit&&<span style={{color:"#ffff00"}}>👁 SOLO LECTURA</span>}
+        <span style={{animation:"blink 1s infinite"}}>▮</span>
+      </div>
+
+      {/* TOAST */}
+      {toast&&(
+        <div style={{position:"fixed",bottom:26,right:26,zIndex:5000,background:"rgba(3,14,5,0.97)",border:`1px solid ${toast.type==="warn"?"#ff2222":"#00ff22"}`,color:toast.type==="warn"?"#ff2222":"#00ff22",padding:"9px 20px",borderRadius:4,fontFamily:"inherit",fontSize:9,letterSpacing:2,animation:"fs 0.2s ease"}}>
+          {toast.type==="warn"?"⚠":"✓"} {toast.msg.toUpperCase()}
+        </div>
+      )}
+
+      {/* MODALS */}
+      {editPC&&!bajaPC&&<PCModal pc={editPC} onClose={()=>setEditPC(null)} onSave={handleSave} onDelete={handleDelete} onBaja={pc=>setBajaPC(pc)} onHist={setHistPC} cu={cu} snd={snd}/>}
+      {bajaPC&&<BajaModal pc={bajaPC} onClose={()=>setBajaPC(null)} onConfirm={handleBaja}/>}
+      {histPC&&<HistModal pc={histPC} onClose={()=>setHistPC(null)}/>}
+      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={handleAddRows}/>}
+    </div>
+  );
+}
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
