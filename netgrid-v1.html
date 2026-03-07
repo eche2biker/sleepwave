@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>NETGRID v6</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#020c04;overflow:hidden;font-family:'Share Tech Mono',monospace}
+#root{width:100vw;height:100vh;}
+#loadError{display:none;position:fixed;inset:0;background:#020c04;color:#ff2222;font-family:monospace;font-size:13px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:9999;letter-spacing:2px;}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#020c04}
+::-webkit-scrollbar-thumb{background:#00ff2230;border-radius:3px}
+input[type=range]{-webkit-appearance:none;background:transparent;height:16px}
+input[type=range]::-webkit-slider-runnable-track{background:#00ff2220;height:3px;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:#00ff22;border-radius:50%;margin-top:-4px;cursor:pointer}
+select option{background:#030e05;color:#00ff22}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="loadError" style="display:none">
+  <span>⚠ ERROR AL CARGAR NETGRID</span>
+  <span id="errMsg" style="font-size:10px;color:#ff8800;opacity:.7"></span>
+  <span style="font-size:9px;opacity:.4">Verifica tu conexión a internet</span>
+</div>
+<script>
+window.addEventListener('error', function(e){
+  var el = document.getElementById('loadError');
+  if(el){ el.style.display='flex'; document.getElementById('errMsg').textContent = e.message || 'Script load error'; }
+});
+</script>
+<script type="text/babel">
+const {useState,useRef,useEffect,useMemo,useCallback,memo} = React;
+
+const uid=()=>Math.random().toString(36).slice(2,9);
+const rndPing=()=>Math.floor(Math.random()*79)+1;
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a))+a;
+const nowT=()=>new Date().toLocaleTimeString('es-MX',{hour12:false});
+const nowDT=()=>new Date().toLocaleString('es-MX',{hour12:false});
+
+const USERS=['jlopez','mgarcia','drojas','aherrera','cgomez','fsanchez'];
+const OSS=['Win 11','Win 10','Ubuntu 22','Win Server','macOS'];
+const DEPTS=['TI','Contabilidad','RRHH','Direccion','Ventas','Almacen','Soporte'];
+const STLIST=['ACTIVO','MANTENIMIENTO','BAJA','REEMPLAZADO'];
+const STLIST_FILTER=['ACTIVO','MANTENIMIENTO','BAJA','REEMPLAZADO'];
+const SC={ACTIVO:'#00ff22',MANTENIMIENTO:'#ffff00',BAJA:'#ff2222',REEMPLAZADO:'#00aaff',ELIMINADO:'#444444'};
+const BWHY=['Descompuesto','Obsoleto','Robado','Actualizacion','Dano fisico','Otro'];
+const DWHY=['Duplicado','Error de registro','Equipo inexistente','Reemplazado','Dado de alta por error','Otro'];
+const VPNP=['OpenVPN','WireGuard','L2TP','PPTP','IKEv2','Cisco AnyConnect'];
+const BLC={0:'#ff2222',1:'#00ff22',2:'#ffff00'};
+const BLLABEL={0:'INACTIVO',1:'ACTIVO',2:'DESCONOCIDO'};
+function blNum(v){var n=parseInt(v);return isNaN(n)?2:n;}
+const PAGE=20;
+const ACCS=[
+  {id:'u1',username:'admin',password:'admin123',name:'Carlos Gomez',role:'ADMIN',dept:'TI',avatar:'CG'},
+  {id:'u2',username:'tecnico',password:'tec456',name:'Diana Rojas',role:'TECNICO',dept:'Soporte',avatar:'DR'},
+  {id:'u3',username:'viewer',password:'view789',name:'Pedro Vega',role:'VIEWER',dept:'Direccion',avatar:'PV'},
+];
+const PERMS={
+  ADMIN:{edit:true,del:true,add:true,delRow:true},
+  TECNICO:{edit:true,del:false,add:false,delRow:false},
+  VIEWER:{edit:false,del:false,add:false,delRow:false},
+};
+const RC={ADMIN:'#00ff22',TECNICO:'#ffff00',VIEWER:'#00aaff'};
+
+function mkPC(r,c){
+  const roll=Math.random();
+  const status=roll>.88?'MANTENIMIENTO':roll>.94?'BAJA':'ACTIVO';
+  const on=status==='ACTIVO';
+  return {
+    id:uid(),
+    name:'PC-'+String(r+1).padStart(2,'0')+String(c+1).padStart(2,'0'),
+    ip:'192.168.'+String(r+1)+'.'+String(c+1),
+    status,ping:on?rndPing():null,
+    user:on?USERS[rnd(0,USERS.length)]:null,
+    os:OSS[rnd(0,OSS.length)],
+    dept:DEPTS[rnd(0,DEPTS.length)],
+    cpu:on?rnd(5,90):0,ram:on?rnd(10,90):0,
+    uptime:on?rnd(0,72)+'h '+rnd(0,60)+'m':'--',
+    alerts:Math.random()>.85?['CPU alta']:[],
+    bajaReason:null,addedBy:'system',
+    addedAt:new Date(Date.now()-Math.random()*365*24*3600000).toISOString(),
+    history:[],
+    mac:'',
+    bitlocker:Math.random()>.3?1:Math.random()>.5?0:2,
+    bl_key:'',
+    ubicacion:'',
+    ultimo_mant:'',
+    winPass:'',email:'',emailPass:'',
+    vpn:{servidor:'',usuario:'',pass:'',protocolo:'OpenVPN'},
+    office365:Math.random()>.5,
+    carpetas:[
+      {nombre:'\\servidor\\Contabilidad',acceso:Math.random()>.4},
+      {nombre:'\\servidor\\Compartida',acceso:Math.random()>.4},
+    ],
+    programas:['Chrome','Antivirus','Office 365','Adobe Reader'].filter(()=>Math.random()>.4),
+  };
+}
+
+function mkRows(n,perRow){
+  return Array.from({length:n},function(_,r){
+    return {id:uid(),label:'Fila '+(r+1),pcs:Array.from({length:perRow},function(_,c){return mkPC(r,c);})};
+  });
+}
+
+function useSound(){
+  const ctx=useRef(null);
+  function go(f,d,t,v){
+    try{
+      if(!ctx.current) ctx.current=new (window.AudioContext||window.webkitAudioContext)();
+      const o=ctx.current.createOscillator(),g=ctx.current.createGain();
+      o.connect(g);g.connect(ctx.current.destination);
+      o.type=t;o.frequency.setValueAtTime(f,ctx.current.currentTime);
+      g.gain.setValueAtTime(v,ctx.current.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.current.currentTime+d);
+      o.start();o.stop(ctx.current.currentTime+d);
+    }catch(e){}
+  }
+  return {
+    click:function(){go(800,.05,'square',.06);},
+    save:function(){go(600,.05,'sine',.06);setTimeout(function(){go(900,.08,'sine',.06);},60);},
+    del:function(){go(300,.12,'sawtooth',.08);setTimeout(function(){go(180,.15,'sawtooth',.06);},80);},
+    login:function(){[300,500,700,900].forEach(function(f,i){setTimeout(function(){go(f,.1,'sine',.05);},i*70);});},
+    logout:function(){[900,600,400,200].forEach(function(f,i){setTimeout(function(){go(f,.1,'sine',.05);},i*60);});},
+    warn:function(){go(440,.1,'square',.09);setTimeout(function(){go(440,.1,'square',.09);},200);},
+    ping:function(){go(1200,.04,'sine',.05);},
+    move:function(){go(500,.05,'triangle',.06);},
+    ok:function(){go(700,.06,'sine',.06);setTimeout(function(){go(1000,.1,'sine',.07);},70);},
+  };
+}
+
+const MatrixRain=memo(function MatrixRain(props){
+  const ref=useRef(null);
+  useEffect(function(){
+    const cv=ref.current;if(!cv)return;
+    const cx=cv.getContext('2d');
+    cv.width=window.innerWidth;cv.height=window.innerHeight;
+    const fs=13,cols=Math.floor(cv.width/fs),drops=Array(cols).fill(1);
+    const chars='0123456789ABCDEF';
+    let fr,last=0;
+    function draw(ts){
+      if(ts-last>60){
+        last=ts;
+        cx.fillStyle='rgba(2,12,4,.05)';cx.fillRect(0,0,cv.width,cv.height);
+        drops.forEach(function(y,i){
+          cx.fillStyle='rgba(0,255,34,'+(Math.random()*.05+.015)+')';
+          cx.font=fs+'px monospace';
+          cx.fillText(chars[Math.floor(Math.random()*chars.length)],i*fs,y*fs);
+          if(y*fs>cv.height&&Math.random()>.975)drops[i]=0;
+          drops[i]++;
+        });
+      }
+      fr=requestAnimationFrame(draw);
+    }
+    fr=requestAnimationFrame(draw);
+    return function(){cancelAnimationFrame(fr);};
+  },[]);
+  return React.createElement('canvas',{ref:ref,style:{position:'fixed',inset:0,pointerEvents:'none',zIndex:0,opacity:props.opacity||.4}});
+});
+
+function PCCard(props){
+  const {pc,onEdit,onDragStart,onDrop,selected,onSelect,canEdit,snd}=props;
+  const [hov,setHov]=useState(false);
+  const isElim=pc.status==='ELIMINADO';
+  const sc=isElim?'#444':SC[pc.status]||'#00ff22';
+  const hasAlert=!isElim&&pc.alerts&&pc.alerts.length>0;
+  return (
+    <div
+      draggable={canEdit&&!isElim}
+      onDragStart={function(e){if(canEdit&&!isElim){onDragStart(e,pc);snd.move();}}}
+      onDragOver={function(e){e.preventDefault();}}
+      onDrop={function(e){if(!isElim)onDrop(e,pc);}}
+      onMouseEnter={function(){setHov(true);}}
+      onMouseLeave={function(){setHov(false);}}
+      style={{width:82,minWidth:82,height:96,flexShrink:0,position:'relative',userSelect:'none',
+        background:isElim?'#0a0a0a':selected?'#001520':hov?(pc.status==='ACTIVO'?'#0a1f0a':'#1a0a0a'):'#050f05',
+        border:'1px solid '+(isElim?'#2a2a2a':selected?'#00aaff':hasAlert?'#ff8800':hov?sc:sc+'28'),
+        borderRadius:6,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+        cursor:isElim?'default':canEdit?'grab':'pointer',transition:'border .12s,background .12s',
+        opacity:isElim?.45:1,
+        boxShadow:hov&&!isElim?'0 0 10px '+sc+'20':selected?'0 0 8px #00aaff25':'none'}}>
+      {isElim&&<div style={{position:'absolute',inset:0,borderRadius:6,background:'repeating-linear-gradient(45deg,transparent,transparent 8px,#1a1a1a08 8px,#1a1a1a08 9px)'}}/>}
+      <div style={{position:'absolute',top:4,right:5,width:6,height:6,borderRadius:'50%',
+        background:sc,animation:'none'}}/>
+      {isElim&&<div style={{position:'absolute',top:4,left:4,fontSize:6,color:'#555',padding:'1px 4px',borderRadius:2,border:'1px solid #2a2a2a',background:'#111',letterSpacing:1}}>DEL</div>}
+      {!isElim&&hasAlert&&<div style={{position:'absolute',top:4,left:4,background:'#ff8800',color:'#000',fontSize:7,fontWeight:700,padding:'1px 4px',borderRadius:2}}>!</div>}
+      {!isElim&&pc.status!=='ACTIVO'&&<div style={{position:'absolute',top:4,left:hasAlert?14:4,fontSize:6,color:sc,padding:'1px 4px',borderRadius:2,border:'1px solid '+sc+'30',background:sc+'12'}}>
+        {pc.status==='MANTENIMIENTO'?'MANT':pc.status==='BAJA'?'BAJA':'REMP'}
+      </div>}
+      {!isElim&&<div onClick={function(e){e.stopPropagation();onSelect(pc.id);snd.click();}}
+        style={{position:'absolute',bottom:4,right:4,width:10,height:10,borderRadius:2,
+          border:'1px solid '+(selected?'#00aaff':'#2a2a2a'),background:selected?'#00aaff':'transparent',
+          cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:7,color:'#000'}}>
+        {selected?'v':''}
+      </div>}
+      <svg viewBox="0 0 44 38" width="36" height="30" fill="none">
+        <rect x="3" y="3" width="38" height="24" rx="2.5" fill={isElim?'#080808':'#100608'} stroke={sc} strokeWidth="1.4" opacity=".9"/>
+        <rect x="6" y="6" width="32" height="18" rx="1" fill="#020a02" stroke={sc} strokeWidth=".5" opacity=".6"/>
+        {!isElim&&<rect x="7" y="7.5" width={Math.max(1,(pc.cpu||0)*.3)} height="3" rx=".5" fill={pc.cpu>80?'#ff2222':pc.cpu>50?'#ffff00':'#00ff22'} opacity=".8"/>}
+        {isElim&&<line x1="8" y1="8" x2="36" y2="28" stroke="#333" strokeWidth="1.5" opacity=".6"/>}
+        {isElim&&<line x1="36" y1="8" x2="8" y2="28" stroke="#333" strokeWidth="1.5" opacity=".6"/>}
+        <rect x="18" y="27" width="8" height="3" rx=".5" fill={sc} opacity=".28"/>
+        <circle cx="22" cy="28.5" r=".9" fill={sc} opacity=".25"/>
+      </svg>
+      <div style={{fontSize:8,color:isElim?'#444':sc,marginTop:2,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center'}}>{pc.name}</div>
+      <div style={{fontSize:7,color:isElim?'#333':'#0a2',opacity:.45,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pc.ip}</div>
+      {!isElim&&pc.mac&&<div style={{fontSize:6,color:'#00ccff',opacity:.55,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center'}}>{pc.mac}</div>}
+      {isElim&&<div style={{fontSize:6,color:'#444',maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center',fontStyle:'italic'}}>{pc.eliminadoMotivo||'eliminado'}</div>}
+      {!isElim&&<div style={{fontSize:7,color:BLC[blNum(pc.bitlocker)],fontWeight:700}}>{BLLABEL[blNum(pc.bitlocker)]}</div>}
+      {!isElim&&pc.status==='ACTIVO'&&pc.ping&&<span style={{fontSize:7,color:pc.ping<20?'#00ff22':pc.ping<50?'#ffff00':'#ff8800'}}>{pc.ping}ms</span>}
+      {hov&&<div onClick={function(){onEdit(pc);snd.click();}}
+        style={{position:'absolute',inset:0,background:isElim?'rgba(0,0,0,.82)':'rgba(0,0,0,.83)',border:'1px solid '+sc,borderRadius:6,
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:3,cursor:'pointer'}}>
+        {isElim
+          ?<React.Fragment>
+            <span style={{fontSize:9,color:'#666',letterSpacing:2}}>VER HISTORIAL</span>
+            <span style={{fontSize:7,color:'#555',opacity:.8}}>{pc.eliminadoPor||''}</span>
+            <span style={{fontSize:6,color:'#444'}}>{pc.eliminadoAt||''}</span>
+          </React.Fragment>
+          :<React.Fragment>
+            <span style={{fontSize:10,color:sc,letterSpacing:2}}>{canEdit?'EDITAR':'VER'}</span>
+            <span style={{fontSize:7,color:sc,opacity:.55}}>{pc.dept}</span>
+            {pc.user&&<span style={{fontSize:7,color:'#0a2',opacity:.65}}>{pc.user}</span>}
+          </React.Fragment>
+        }
+      </div>}
+    </div>
+  );
+}
+
+function GridRow(props){
+  const {row,rIdx,perms,selIds,onEdit,onDragStart,onDrop,onSel,onAddPC,onDelRow,onRowPwr,snd}=props;
+  const [page,setPage]=useState(0);
+  const total=Math.ceil(row.pcs.length/PAGE);
+  const shown=row.pcs.slice(page*PAGE,(page+1)*PAGE);
+  const onPct=Math.round(row.pcs.filter(function(p){return p.status==='ACTIVO';}).length/Math.max(row.pcs.length,1)*100);
+  const tb={padding:'2px 9px',background:'transparent',fontFamily:'monospace',fontSize:8,letterSpacing:2,cursor:'pointer',borderRadius:3,transition:'all .12s'};
+  return (
+    <div style={{marginBottom:12,background:row.eliminada?'rgba(8,8,8,.88)':'rgba(3,14,5,.88)',border:'1px solid '+(row.eliminada?'#2a2a2a':'#00ff2213'),borderRadius:8,padding:'10px 14px',opacity:row.eliminada?.6:1}}>
+      <div style={{display:'flex',alignItems:'center',marginBottom:8,gap:8,flexWrap:'wrap'}}>
+        <span style={{fontSize:10,letterSpacing:3,color:row.eliminada?'#444':'#00ff22',flexShrink:0}}>{(row.eliminada?'x ':'>  ')+row.label.toUpperCase()}{row.eliminada&&<span style={{fontSize:7,color:'#444',marginLeft:6}}>[{row.eliminadaMotivo||'eliminada'}]</span>}</span>
+        <span style={{fontSize:7,opacity:.3}}>{row.pcs.filter(function(p){return p.status==='ACTIVO';}).length+'/'+row.pcs.length}</span>
+        <div style={{width:48,height:3,background:'#0a100a',borderRadius:2,overflow:'hidden',flexShrink:0}}>
+          <div style={{height:'100%',width:onPct+'%',background:'linear-gradient(90deg,#0a2,#00ff22)',transition:'width .5s'}}/>
+        </div>
+        {total>1&&<div style={{display:'flex',alignItems:'center',gap:4}}>
+          <button onClick={function(){setPage(function(p){return Math.max(0,p-1);});}} disabled={page===0} style={Object.assign({},tb,{border:'1px solid #00ff2220',color:page===0?'#333':'#00ff22'})}>{'<'}</button>
+          <span style={{fontSize:8,color:'#00ff22',opacity:.4,minWidth:70,textAlign:'center'}}>{(page+1)+'/'+total+' - '+row.pcs.length+' PCs'}</span>
+          <button onClick={function(){setPage(function(p){return Math.min(total-1,p+1);});}} disabled={page===total-1} style={Object.assign({},tb,{border:'1px solid #00ff2220',color:page===total-1?'#333':'#00ff22'})}>{'>'}</button>
+        </div>}
+        <div style={{flex:1}}/>
+        {perms.edit&&<React.Fragment>
+          <button onClick={function(){onRowPwr(rIdx,'ACTIVO');snd.click();}}
+            style={Object.assign({},tb,{border:'1px solid #00ff2212',color:'#00ff2245'})}
+            onMouseOver={function(e){e.target.style.borderColor='#00ff22';e.target.style.color='#00ff22';}}
+            onMouseOut={function(e){e.target.style.borderColor='#00ff2212';e.target.style.color='#00ff2245';}}>ON</button>
+          <button onClick={function(){onRowPwr(rIdx,'MANTENIMIENTO');snd.click();}}
+            style={Object.assign({},tb,{border:'1px solid #ffff0012',color:'#ffff0040'})}
+            onMouseOver={function(e){e.target.style.borderColor='#ffff00';e.target.style.color='#ffff00';}}
+            onMouseOut={function(e){e.target.style.borderColor='#ffff0012';e.target.style.color='#ffff0040';}}>MANT</button>
+        </React.Fragment>}
+        {perms.delRow&&<button onClick={function(){onDelRow(row.id);snd.del();}}
+          style={Object.assign({},tb,{border:'1px solid #ff222212',color:'#ff222235'})}
+          onMouseOver={function(e){e.target.style.borderColor='#ff2222';e.target.style.color='#ff2222';}}
+          onMouseOut={function(e){e.target.style.borderColor='#ff222212';e.target.style.color='#ff222235';}}>X</button>}
+      </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+        {shown.map(function(pc){return <PCCard key={pc.id} pc={pc} onEdit={onEdit} onDragStart={onDragStart} onDrop={onDrop} selected={selIds.has(pc.id)} onSelect={onSel} canEdit={perms.edit} snd={snd}/>;} )}
+        {perms.add&&page===total-1&&<div onClick={function(){onAddPC(row.id);}}
+          style={{width:82,minWidth:82,height:96,flexShrink:0,borderRadius:6,border:'1.5px dashed #1a3a1a',
+            display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#1a4a1a',fontSize:24,background:'transparent'}}
+          onMouseOver={function(e){e.currentTarget.style.borderColor='#00ff22';e.currentTarget.style.color='#00ff22';}}
+          onMouseOut={function(e){e.currentTarget.style.borderColor='#1a3a1a';e.currentTarget.style.color='#1a4a1a';}}>+</div>}
+      </div>
+    </div>
+  );
+}
+
+function Sec(props){
+  const [open,setOpen]=useState(props.open!==false);
+  const c=props.color||'#00ff22';
+  return (
+    <div style={{marginBottom:8,border:'1px solid '+c+'18',borderRadius:6,overflow:'hidden'}}>
+      <div onClick={function(){setOpen(function(o){return !o;});}}
+        style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:c+'0a',cursor:'pointer',userSelect:'none'}}>
+        <span style={{fontSize:14}}>{props.icon}</span>
+        <span style={{fontSize:8,letterSpacing:3,color:c,flex:1,fontWeight:700}}>{props.title}</span>
+        <span style={{fontSize:10,color:c,opacity:.5}}>{open?'v':'>>'}</span>
+      </div>
+      {open&&<div style={{padding:'12px',background:'#020c04'}}>{props.children}</div>}
+    </div>
+  );
+}
+
+function PwdField(props){
+  const {label,val,onChange,disabled,inp,ac}=props;
+  const [show,setShow]=useState(false);
+  const c=ac||'#00ff22';
+  return (
+    <div>
+      <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>{label}</div>
+      <div style={{position:'relative'}}>
+        <input type={show?'text':'password'} value={val||''} onChange={onChange} disabled={disabled}
+          style={Object.assign({},inp,{paddingRight:28,opacity:disabled?.55:1,cursor:disabled?'not-allowed':'text'})}
+          onFocus={function(e){if(!disabled)e.target.style.borderColor=c;}}
+          onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+        <span onClick={function(){setShow(function(s){return !s;});}}
+          style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',cursor:'pointer',fontSize:11,opacity:.5,color:c,userSelect:'none'}}>
+          {show?'O':'*'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ItemList(props){
+  const {items,onToggle,onAdd,onDel,canEdit,color,showCheck}=props;
+  const [adding,setAdding]=useState(false);
+  const [newVal,setNewVal]=useState('');
+  const c=color||'#00ff22';
+  function commit(){
+    if(newVal.trim()){onAdd(newVal.trim());setNewVal('');}
+    setAdding(false);
+  }
+  return (
+    <div>
+      {items.length===0&&!adding&&<div style={{fontSize:9,opacity:.25,textAlign:'center',padding:'8px',letterSpacing:2}}>VACIO</div>}
+      {items.map(function(item,i){
+        const nombre=typeof item==='string'?item:item.nombre;
+        const acceso=typeof item==='object'&&item.acceso!==undefined?item.acceso:undefined;
+        return (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,padding:'5px 8px',background:'#030e05',borderRadius:4,
+            border:'1px solid '+(acceso===false?'#ff222218':acceso===true?c+'22':'#00ff2210')}}>
+            {showCheck&&<div onClick={function(){if(canEdit)onToggle(i);}}
+              style={{width:16,height:16,borderRadius:3,border:'1.5px solid '+(acceso?c:'#444'),background:acceso?c+'25':'transparent',
+                display:'flex',alignItems:'center',justifyContent:'center',cursor:canEdit?'pointer':'default',flexShrink:0}}>
+              {acceso&&<span style={{fontSize:10,color:c,lineHeight:1}}>v</span>}
+            </div>}
+            <span style={{flex:1,fontSize:9,color:acceso===false?'#ff222270':'#00ff22',wordBreak:'break-all'}}>{nombre}</span>
+            {canEdit&&<span onClick={function(){onDel(i);}}
+              style={{cursor:'pointer',fontSize:10,color:'#ff222240',flexShrink:0}}
+              onMouseOver={function(e){e.target.style.color='#ff2222';}}
+              onMouseOut={function(e){e.target.style.color='#ff222240';}}>X</span>}
+          </div>
+        );
+      })}
+      {canEdit&&(adding
+        ?<div style={{display:'flex',gap:6,marginTop:6}}>
+          <input autoFocus value={newVal} onChange={function(e){setNewVal(e.target.value);}}
+            placeholder="Escribir y Enter..."
+            onKeyDown={function(e){if(e.key==='Enter')commit();if(e.key==='Escape')setAdding(false);}}
+            style={{flex:1,background:'#0a180a',border:'1px solid '+c+'40',color:'#00ff22',fontFamily:'monospace',fontSize:10,padding:'5px 8px',borderRadius:4,outline:'none'}}/>
+          <button onClick={commit} style={{padding:'4px 10px',background:c+'18',border:'1px solid '+c,color:c,fontFamily:'monospace',fontSize:9,cursor:'pointer',borderRadius:4}}>OK</button>
+          <button onClick={function(){setAdding(false);}} style={{padding:'4px 8px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'monospace',fontSize:9,cursor:'pointer',borderRadius:4}}>X</button>
+        </div>
+        :<button onClick={function(){setAdding(true);}}
+          style={{marginTop:6,padding:'4px 10px',background:'transparent',border:'1px dashed '+c+'35',color:c,opacity:.6,fontFamily:'monospace',fontSize:9,cursor:'pointer',borderRadius:4,width:'100%'}}
+          onMouseOver={function(e){e.currentTarget.style.opacity='1';}}
+          onMouseOut={function(e){e.currentTarget.style.opacity='.6';}}>+ Agregar</button>
+      )}
+    </div>
+  );
+}
+
+function PCModal(props){
+  var pc=props.pc,onClose=props.onClose,onSave=props.onSave,onDelete=props.onDelete,onBaja=props.onBaja,onHist=props.onHist,cu=props.cu,snd=props.snd;
+  var isElimModal=pc.status==='ELIMINADO';
+  var init=Object.assign({},pc,{
+    winPass:pc.winPass||'',email:pc.email||'',emailPass:pc.emailPass||'',
+    vpn:pc.vpn||{servidor:'',usuario:'',pass:'',protocolo:'OpenVPN'},
+    office365:pc.office365||false,carpetas:pc.carpetas||[],programas:pc.programas||[],
+    mac:pc.mac||'',bitlocker:blNum(pc.bitlocker),bl_key:pc.bl_key||'',
+    ubicacion:pc.ubicacion||'',ultimo_mant:pc.ultimo_mant||''
+  });
+  var ds=useState(init); var d=ds[0]; var setD=ds[1];
+  var ts=useState('info'); var tab=ts[0]; var setTab=ts[1];
+  var p=isElimModal?{edit:false,del:false,add:false,delRow:false}:PERMS[cu.role];
+  function s(k,v){setD(function(x){return Object.assign({},x,{[k]:v});});}
+  function sv(k,v){setD(function(x){return Object.assign({},x,{vpn:Object.assign({},x.vpn,{[k]:v})});});}
+  var inp={background:'#0a180a',border:'1px solid #00ff2218',color:'#00ff22',fontFamily:'monospace',fontSize:11,padding:'6px 9px',width:'100%',borderRadius:4,outline:'none',boxSizing:'border-box'};
+  var sc=SC[d.status]||'#00ff22';
+  var bl=blNum(d.bitlocker);
+
+  function F(label,val,key,ac){
+    return (
+      <div>
+        <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>{label}</div>
+        <input value={val||''} onChange={function(e){s(key,e.target.value);}} disabled={!p.edit}
+          style={Object.assign({},inp,{opacity:p.edit?1:.55})}
+          onFocus={function(e){if(p.edit)e.target.style.borderColor=ac||'#00ff22';}}
+          onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,8,2,.93)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,backdropFilter:'blur(8px)'}}>
+      <div style={{background:isElimModal?'#0a0808':'#030e05',border:'1px solid '+(isElimModal?'#33333340':'#00ff2228'),borderRadius:8,width:460,height:520,display:'flex',flexDirection:'column',fontFamily:'monospace',color:isElimModal?'#555':'#00ff22'}}>
+
+        <div style={{padding:'10px 14px 0',borderBottom:'1px solid '+(isElimModal?'#33333320':'#00ff2210'),flexShrink:0,background:isElimModal?'#0a0808':undefined}}>
+          {isElimModal&&<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'6px 10px',background:'#1a0000',border:'1px solid #44444430',borderRadius:5}}>
+            <span style={{fontSize:9,color:'#666',letterSpacing:2,fontWeight:700}}>x ELIMINADO</span>
+            <span style={{fontSize:8,color:'#555'}}>{pc.eliminadoMotivo||''}</span>
+            <div style={{flex:1}}/>
+            <span style={{fontSize:7,color:'#444'}}>{pc.eliminadoPor||''}</span>
+            <span style={{fontSize:6,color:'#333'}}>{pc.eliminadoAt||''}</span>
+          </div>}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:7,height:7,borderRadius:'50%',background:isElimModal?'#444':sc,flexShrink:0}}/>
+              <span style={{fontSize:13,letterSpacing:2,fontWeight:700,color:isElimModal?'#555':undefined}}>{d.name}</span>
+              <span style={{fontSize:7,padding:'2px 6px',background:(isElimModal?'#44444415':sc+'15'),border:'1px solid '+(isElimModal?'#44444435':sc+'35'),borderRadius:3,color:isElimModal?'#555':sc}}>{d.status}</span>
+              {!isElimModal&&bl===0&&<span style={{fontSize:7,color:'#ff2222'}}>! SIN CIFRADO</span>}
+            </div>
+            <div style={{display:'flex',gap:5,alignItems:'center'}}>
+              {isElimModal&&<span style={{fontSize:6,color:'#666',opacity:.8,padding:'2px 6px',border:'1px solid #44444430',borderRadius:3,letterSpacing:1}}>SOLO LECTURA</span>}
+              {!isElimModal&&!p.edit&&<span style={{fontSize:6,color:'#ffff00',opacity:.6,padding:'2px 6px',border:'1px solid #ffff0020',borderRadius:3}}>SOLO LECTURA</span>}
+              <button onClick={onClose} style={{padding:'2px 9px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:10,cursor:'pointer',borderRadius:3}}>X</button>
+            </div>
+          </div>
+          <div style={{display:'flex'}}>
+            {[['info','INFO'],['creds','CREDS'],['apps','APPS'],['log','LOG']].map(function(t){
+              return (
+                <button key={t[0]} onClick={function(){setTab(t[0]);snd.click();}}
+                  style={{flex:1,padding:'6px 0',background:'transparent',border:'none',borderBottom:tab===t[0]?'2px solid #00ff22':'2px solid transparent',color:tab===t[0]?'#00ff22':'#00ff2230',fontFamily:'monospace',fontSize:8,letterSpacing:2,cursor:'pointer'}}>
+                  {t[1]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{flex:1,overflowY:'auto',padding:'12px 14px'}}>
+
+          {tab==='info'&&<div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              {F('NOMBRE',d.name,'name')}
+              {F('IP',d.ip,'ip')}
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>MAC ADDRESS</div>
+                <input value={d.mac||''} onChange={function(e){s('mac',e.target.value);}} disabled={!p.edit}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                  style={Object.assign({},inp,{color:'#00ccff',opacity:p.edit?1:.55})}
+                  onFocus={function(e){if(p.edit)e.target.style.borderColor='#00ccff';}}
+                  onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+              </div>
+              {F('USUARIO',d.user,'user')}
+              {F('DEPARTAMENTO',d.dept,'dept')}
+              {F('SISTEMA OPERATIVO',d.os,'os')}
+              {F('UBICACION',d.ubicacion,'ubicacion','#ff8800')}
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>ULT. MANTENIMIENTO</div>
+                <input type="date" value={d.ultimo_mant||''} onChange={function(e){s('ultimo_mant',e.target.value);}} disabled={!p.edit}
+                  style={Object.assign({},inp,{colorScheme:'dark',opacity:p.edit?1:.55})}
+                  onFocus={function(e){if(p.edit)e.target.style.borderColor='#ffff00';}}
+                  onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+              </div>
+            </div>
+            <div style={{padding:'8px 10px',background:'#060e06',border:'1px solid #00ff2215',borderRadius:5,marginBottom:8}}>
+              <div style={{fontSize:6,letterSpacing:3,opacity:.3,marginBottom:6}}>BITLOCKER</div>
+              <div style={{display:'flex',gap:5,marginBottom:7}}>
+                {[[1,'BL:ON','#00ff22'],[0,'BL:OFF','#ff2222'],[2,'BL:?','#ffff00']].map(function(it){
+                  var v=it[0],l=it[1],c=it[2],active=bl===v;
+                  return (
+                    <button key={v} onClick={function(){if(p.edit)s('bitlocker',v);}} disabled={!p.edit}
+                      style={{flex:1,padding:'5px 2px',background:active?c+'18':'transparent',border:'1.5px solid '+(active?c:c+'20'),color:active?c:c+'40',fontFamily:'monospace',fontSize:8,fontWeight:700,cursor:p.edit?'pointer':'not-allowed',borderRadius:3,transition:'all .12s'}}>
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+              <PwdField label="RECOVERY KEY" val={d.bl_key} onChange={function(e){s('bl_key',e.target.value);}} disabled={!p.edit} inp={Object.assign({},inp,{fontSize:10})} ac="#00ff22"/>
+            </div>
+            {p.edit&&<div style={{marginBottom:8}}>
+              <div style={{fontSize:6,letterSpacing:2,opacity:.3,marginBottom:5}}>ESTADO</div>
+              <div style={{display:'flex',gap:4}}>
+                {STLIST.map(function(st){
+                  return (
+                    <button key={st} onClick={function(){s('status',st);}}
+                      style={{flex:1,padding:'4px 2px',background:d.status===st?SC[st]+'15':'transparent',border:'1px solid '+(d.status===st?SC[st]:SC[st]+'20'),color:d.status===st?SC[st]:SC[st]+'45',fontFamily:'inherit',fontSize:6,cursor:'pointer',borderRadius:3}}>
+                      {st}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>}
+          </div>}
+
+          {tab==='creds'&&<div>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>WINDOWS</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+              {F('USUARIO WINDOWS',d.user,'user','#00aaff')}
+              <PwdField label="CONTRASENA WINDOWS" val={d.winPass} onChange={function(e){s('winPass',e.target.value);}} disabled={!p.edit} inp={inp} ac="#00aaff"/>
+            </div>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>CORREO</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>EMAIL</div>
+                <input type="email" value={d.email||''} onChange={function(e){s('email',e.target.value);}} disabled={!p.edit}
+                  placeholder="user@empresa.com" style={Object.assign({},inp,{opacity:p.edit?1:.55})}
+                  onFocus={function(e){if(p.edit)e.target.style.borderColor='#ff8800';}}
+                  onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+              </div>
+              <PwdField label="CONTRASENA EMAIL" val={d.emailPass} onChange={function(e){s('emailPass',e.target.value);}} disabled={!p.edit} inp={inp} ac="#ff8800"/>
+            </div>
+            <div onClick={function(){if(p.edit)s('office365',!d.office365);}}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:d.office365?'#0a0a1a':'#050505',border:'1px solid '+(d.office365?'#00aaff30':'#222'),borderRadius:4,cursor:p.edit?'pointer':'default',userSelect:'none',marginBottom:12}}>
+              <div style={{width:15,height:15,borderRadius:3,border:'1.5px solid '+(d.office365?'#00aaff':'#333'),background:d.office365?'#00aaff22':'transparent',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:'#00aaff'}}>
+                {d.office365&&'v'}
+              </div>
+              <span style={{fontSize:8,color:d.office365?'#00aaff':'#444',letterSpacing:2}}>OFFICE 365 - {d.office365?'ACTIVO':'INACTIVO'}</span>
+            </div>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>VPN</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>SERVIDOR</div>
+                <input value={d.vpn.servidor||''} onChange={function(e){sv('servidor',e.target.value);}} disabled={!p.edit}
+                  placeholder="vpn.empresa.com" style={Object.assign({},inp,{opacity:p.edit?1:.55})}
+                  onFocus={function(e){if(p.edit)e.target.style.borderColor='#a855f7';}}
+                  onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+              </div>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>PROTOCOLO</div>
+                <select value={d.vpn.protocolo||'OpenVPN'} onChange={function(e){sv('protocolo',e.target.value);}} disabled={!p.edit}
+                  style={Object.assign({},inp,{cursor:p.edit?'pointer':'not-allowed',opacity:p.edit?1:.55})}>
+                  {VPNP.map(function(v){return <option key={v} value={v}>{v}</option>;})}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>USUARIO VPN</div>
+                <input value={d.vpn.usuario||''} onChange={function(e){sv('usuario',e.target.value);}} disabled={!p.edit}
+                  style={Object.assign({},inp,{opacity:p.edit?1:.55})}
+                  onFocus={function(e){if(p.edit)e.target.style.borderColor='#a855f7';}}
+                  onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
+              </div>
+              <PwdField label="CONTRASENA VPN" val={d.vpn.pass} onChange={function(e){sv('pass',e.target.value);}} disabled={!p.edit} inp={inp} ac="#a855f7"/>
+            </div>
+          </div>}
+
+          {tab==='apps'&&<div>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>CARPETAS COMPARTIDAS</div>
+            <ItemList items={d.carpetas}
+              onToggle={function(i){setD(function(x){return Object.assign({},x,{carpetas:x.carpetas.map(function(c,j){return j===i?Object.assign({},c,{acceso:!c.acceso}):c;})});});}}
+              onAdd={function(nombre){setD(function(x){return Object.assign({},x,{carpetas:[...x.carpetas,{nombre:nombre,acceso:false}]});});}}
+              onDel={function(i){setD(function(x){return Object.assign({},x,{carpetas:x.carpetas.filter(function(_,j){return j!==i;})});});}}
+              canEdit={p.edit} color="#ffff00" showCheck={true}/>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,margin:'12px 0 8px'}}>PROGRAMAS INSTALADOS</div>
+            <ItemList items={d.programas}
+              onToggle={function(){}}
+              onAdd={function(nombre){setD(function(x){return Object.assign({},x,{programas:[...x.programas,nombre]});});}}
+              onDel={function(i){setD(function(x){return Object.assign({},x,{programas:x.programas.filter(function(_,j){return j!==i;})});});}}
+              canEdit={p.edit} color="#00ff22" showCheck={false}/>
+          </div>}
+
+          {tab==='log'&&<div>
+            {pc.history.length===0
+              ?<div style={{textAlign:'center',padding:'40px 0',opacity:.2,fontSize:10,letterSpacing:2}}>SIN CAMBIOS</div>
+              :pc.history.slice().reverse().map(function(h,i){return (
+                <div key={i} style={{marginBottom:8,padding:'7px 10px',background:'#020c04',border:'1px solid #00ff2210',borderRadius:4}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                    <span style={{fontSize:8,color:'#00aaff',fontWeight:700}}>{h.action}</span>
+                    <span style={{fontSize:7,opacity:.3}}>{(h.at||'').slice(0,16)}</span>
+                  </div>
+                  {(h.changes||[]).map(function(c,j){return (
+                    <div key={j} style={{fontSize:7,opacity:.55,marginBottom:2}}>
+                      <span style={{color:'#ffff00'}}>{c.field}</span>
+                      <span style={{color:'#aaa'}}>{': '}</span>
+                      <span style={{color:'#ff2222'}}>{c.from}</span>
+                      <span style={{color:'#aaa'}}>{' > '}</span>
+                      <span style={{color:'#00ff22'}}>{c.to}</span>
+                    </div>
+                  );})}
+                  <div style={{fontSize:6,opacity:.2,marginTop:3}}>{h.user} ({h.role})</div>
+                </div>
+              );})}
+            
+          </div>}
+        </div>
+
+        <div style={{padding:'8px 14px',borderTop:'1px solid #00ff2210',display:'flex',gap:6,flexShrink:0,background:'#030e05'}}>
+          {p.edit&&<button onClick={function(){onSave(d);snd.save();}}
+            style={{flex:2,padding:'7px',background:'#0a1a0a',border:'1px solid #00ff22',color:'#00ff22',fontFamily:'inherit',fontSize:8,letterSpacing:3,cursor:'pointer',borderRadius:4}}
+            onMouseOver={function(e){e.target.style.background='#0f2210';}}
+            onMouseOut={function(e){e.target.style.background='#0a1a0a';}}>GUARDAR</button>}
+          {p.edit&&d.status!=='BAJA'&&<button onClick={function(){onBaja(pc);}}
+            style={{flex:1,padding:'7px',background:'#1a0000',border:'1px solid #ff222235',color:'#ff2222',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:4}}>BAJA</button>}
+          {p.del&&<button onClick={function(){onDelete(pc.id);snd.del();}}
+            style={{flex:1,padding:'7px',background:'#1a0000',border:'1px solid #ff2222',color:'#ff2222',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:4}}>DEL</button>}
+          <button onClick={onClose}
+            style={{flex:1,padding:'7px',background:'#0d0d0d',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:4}}>ESC</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistModal(props){
+  const {pc,onClose}=props;
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,8,2,.92)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'#030e05',border:'1px solid #00ff2228',borderRadius:10,padding:'24px',width:480,maxHeight:'78vh',display:'flex',flexDirection:'column',fontFamily:'monospace',color:'#00ff22'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+          <div>
+            <div style={{fontSize:13,letterSpacing:3,fontWeight:700}}>HISTORIAL - {pc.name}</div>
+            <div style={{fontSize:7,opacity:.3,marginTop:2}}>{pc.history.length+' cambios'}</div>
+          </div>
+          <button onClick={onClose} style={{background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:9,padding:'4px 12px',cursor:'pointer',borderRadius:4}}>X</button>
+        </div>
+        <div style={{flex:1,overflowY:'auto'}}>
+          {pc.history.length===0
+            ?<div style={{textAlign:'center',padding:'28px',opacity:.2,fontSize:10,letterSpacing:2}}>SIN CAMBIOS</div>
+            :[...pc.history].reverse().map(function(h,i){return (
+              <div key={i} style={{display:'flex',gap:10,marginBottom:8,padding:'8px 10px',background:'#020c04',border:'1px solid #00ff2210',borderRadius:4}}>
+                <div style={{width:26,height:26,borderRadius:'50%',background:RC[h.role]+'18',border:'1px solid '+RC[h.role]+'35',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:RC[h.role],fontWeight:700,flexShrink:0}}>{h.avatar}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                    <span style={{fontSize:9}}>{h.user}</span>
+                    <span style={{fontSize:7,opacity:.3}}>{h.at}</span>
+                  </div>
+                  <div style={{fontSize:8,color:RC[h.role],letterSpacing:1,marginBottom:3}}>{h.action}</div>
+                  {h.changes&&h.changes.map(function(ch,j){return (
+                    <div key={j} style={{fontSize:7,opacity:.5,marginBottom:1}}>{'> '+ch.field+': '}<span style={{color:'#ff2222'}}>{ch.from}</span>{' -> '}<span style={{color:'#00ff22'}}>{ch.to}</span></div>
+                  );})}
+                </div>
+              </div>
+            );})}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BajaModal(props){
+  const {pc,onClose,onConfirm}=props;
+  const [reason,setReason]=useState(BWHY[0]);
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,4,0,.92)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'#0d0000',border:'1px solid #ff2222',borderRadius:10,padding:'28px 32px',width:360,fontFamily:'monospace',color:'#ff2222'}}>
+        <div style={{fontSize:13,letterSpacing:3,fontWeight:700,marginBottom:6}}>DAR DE BAJA</div>
+        <div style={{fontSize:8,opacity:.4,marginBottom:18}}>{pc.name+' - '+pc.ip}</div>
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:.4,marginBottom:6}}>MOTIVO</div>
+          <select value={reason} onChange={function(e){setReason(e.target.value);}} style={{background:'#1a0000',border:'1px solid #ff222235',color:'#ff2222',fontFamily:'inherit',fontSize:12,padding:'8px 10px',width:'100%',borderRadius:4,outline:'none'}}>
+            {BWHY.map(function(r){return <option key={r} value={r}>{r}</option>;})}
+          </select>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button onClick={function(){onConfirm(reason);}} style={{flex:2,padding:'9px',background:'#2a0000',border:'1px solid #ff2222',color:'#ff2222',fontFamily:'inherit',fontSize:9,letterSpacing:3,cursor:'pointer',borderRadius:4}}>CONFIRMAR</button>
+          <button onClick={onClose} style={{flex:1,padding:'9px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:9,cursor:'pointer',borderRadius:4}}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DelConfirmModal(props){
+  const {item,type,onClose,onConfirm}=props;
+  const [reason,setReason]=useState(DWHY[0]);
+  const [notes,setNotes]=useState('');
+  const isRow=type==='fila';
+  const label=isRow?(item.label+' ('+item.pcs.length+' PCs)'):(item.name+' - '+item.ip);
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,4,0,.95)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:4000,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'#0d0000',border:'2px solid #ff2222',borderRadius:10,padding:'28px 32px',width:380,fontFamily:'monospace',color:'#ff2222'}}>
+        <div style={{fontSize:7,letterSpacing:4,opacity:.5,marginBottom:4}}>{isRow?'ELIMINAR FILA':'ELIMINAR PC'}</div>
+        <div style={{fontSize:14,letterSpacing:2,fontWeight:700,marginBottom:4}}>CONFIRMAR ELIMINACION</div>
+        <div style={{fontSize:9,color:'#ff8800',opacity:.8,marginBottom:20,padding:'7px 10px',background:'#ff220210',border:'1px solid #ff222230',borderRadius:4}}>{label}</div>
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:.45,marginBottom:6}}>MOTIVO DE ELIMINACION</div>
+          <select value={reason} onChange={function(e){setReason(e.target.value);}}
+            style={{background:'#1a0000',border:'1px solid #ff222235',color:'#ff2222',fontFamily:'inherit',fontSize:11,padding:'8px 10px',width:'100%',borderRadius:4,outline:'none',marginBottom:8}}>
+            {DWHY.map(function(r){return <option key={r} value={r}>{r}</option>;})}
+          </select>
+          <textarea value={notes} onChange={function(e){setNotes(e.target.value);}}
+            placeholder="Notas adicionales (opcional)..."
+            style={{background:'#0d0000',border:'1px solid #ff222225',color:'#ff8800',fontFamily:'inherit',fontSize:10,padding:'8px 10px',width:'100%',borderRadius:4,outline:'none',resize:'none',height:52}}/>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button onClick={function(){onConfirm(reason,notes);}}
+            style={{flex:2,padding:'10px',background:'#2a0000',border:'1px solid #ff2222',color:'#ff2222',fontFamily:'inherit',fontSize:9,letterSpacing:3,cursor:'pointer',borderRadius:4,fontWeight:700}}>
+            ELIMINAR
+          </button>
+          <button onClick={onClose}
+            style={{flex:1,padding:'10px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:9,cursor:'pointer',borderRadius:4}}>
+            CANCELAR
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddModal(props){
+  const {onClose,onAdd}=props;
+  const [qty,setQty]=useState(1);
+  const [pcs,setPcs]=useState(20);
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,8,2,.9)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:3000,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'#030e05',border:'1px solid #00ff2228',borderRadius:10,padding:'28px 32px',width:360,fontFamily:'monospace',color:'#00ff22'}}>
+        <div style={{fontSize:13,letterSpacing:3,fontWeight:700,marginBottom:20}}>AGREGAR FILAS</div>
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:6}}>{'FILAS: '}<span style={{fontSize:16,fontWeight:700}}>{qty}</span></div>
+          <input type="range" min="1" max="20" value={qty} onChange={function(e){setQty(+e.target.value);}} style={{width:'100%',accentColor:'#00ff22'}}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:6}}>{'PCs POR FILA: '}<span style={{fontSize:16,fontWeight:700}}>{pcs}</span></div>
+          <input type="range" min="5" max="100" step="5" value={pcs} onChange={function(e){setPcs(+e.target.value);}} style={{width:'100%',accentColor:'#00ff22'}}/>
+        </div>
+        <div style={{padding:'10px',background:'#020c04',border:'1px solid #00ff2215',borderRadius:5,marginBottom:18,textAlign:'center'}}>
+          <span style={{fontSize:10,opacity:.6}}>Se crearan </span>
+          <span style={{fontSize:16,fontWeight:700,color:'#00ff22'}}>{qty*pcs}</span>
+          <span style={{fontSize:10,opacity:.6}}> equipos</span>
+        </div>
+        <div style={{display:'flex',gap:10}}>
+          <button onClick={function(){onAdd(qty,pcs);}} style={{flex:2,padding:'10px',background:'#0a1a0a',border:'1px solid #00ff22',color:'#00ff22',fontFamily:'inherit',fontSize:10,letterSpacing:3,cursor:'pointer',borderRadius:4}} onMouseOver={function(e){e.target.style.background='#0f2210';}} onMouseOut={function(e){e.target.style.background='#0a1a0a';}}>CREAR</button>
+          <button onClick={onClose} style={{flex:1,padding:'10px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:10,cursor:'pointer',borderRadius:4}}>CANCEL</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Login(props){
+  const {onLogin,snd}=props;
+  const [user,setUser]=useState('');
+  const [pass,setPass]=useState('');
+  const [err,setErr]=useState('');
+  const [load,setLoad]=useState(false);
+  function go(){
+    var acc=ACCS.find(function(a){return a.username===user&&a.password===pass;});
+    if(!acc){setErr('CREDENCIALES INVALIDAS');snd.warn();return;}
+    setLoad(true);setErr('');
+    setTimeout(function(){snd.login();onLogin(acc);},800);
+  }
+  var inp={background:'#050f05',border:'1px solid #00ff2220',color:'#00ff22',fontFamily:'monospace',fontSize:12,padding:'11px 13px',width:'100%',borderRadius:4,outline:'none',letterSpacing:2};
+  return (
+    <div style={{position:'fixed',inset:0,background:'#020c04',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100}}>
+      <MatrixRain opacity={.65}/>
+      <div style={{position:'relative',zIndex:10,width:400}}>
+        <div style={{textAlign:'center',marginBottom:36}}>
+          <div style={{fontFamily:"'Orbitron',monospace",fontSize:30,fontWeight:900,letterSpacing:8,color:'#00ff22',textShadow:'0 0 30px #00ff22'}}>NETGRID</div>
+          <div style={{fontSize:8,letterSpacing:5,color:'#00ff22',opacity:.35,marginTop:4}}>NETWORK ADMIN v6.0</div>
+        </div>
+        <div style={{background:'rgba(3,14,5,.97)',border:'1px solid #00ff2220',borderRadius:12,padding:'32px 36px',backdropFilter:'blur(10px)'}}>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:.35,marginBottom:6}}>USUARIO</div>
+            <input value={user} onChange={function(e){setUser(e.target.value);}} style={inp} placeholder="usuario"
+              onKeyDown={function(e){if(e.key==='Enter')go();}}
+              onFocus={function(e){e.target.style.borderColor='#00ff22';}}
+              onBlur={function(e){e.target.style.borderColor='#00ff2220';}}/>
+          </div>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:.35,marginBottom:6}}>CONTRASENA</div>
+            <input type="password" value={pass} onChange={function(e){setPass(e.target.value);}} style={inp} placeholder="..."
+              onKeyDown={function(e){if(e.key==='Enter')go();}}
+              onFocus={function(e){e.target.style.borderColor='#00ff22';}}
+              onBlur={function(e){e.target.style.borderColor='#00ff2220';}}/>
+          </div>
+          {err&&<div style={{fontSize:9,color:'#ff2222',letterSpacing:2,marginBottom:10,textAlign:'center'}}>{err}</div>}
+          <button onClick={go} disabled={load} style={{width:'100%',padding:'12px',marginTop:12,background:'#0a1a0a',border:'1px solid #00ff22',color:'#00ff22',fontFamily:'monospace',fontSize:10,letterSpacing:4,cursor:load?'wait':'pointer',borderRadius:4,transition:'all .2s'}}
+            onMouseOver={function(e){e.target.style.background='#0f2210';}}
+            onMouseOut={function(e){e.target.style.background='#0a1a0a';}}>
+            {load?'VERIFICANDO...':'INICIAR SESION'}
+          </button>
+          <div style={{marginTop:20,padding:'10px',background:'#020c04',border:'1px solid #00ff2210',borderRadius:5}}>
+            <div style={{fontSize:7,letterSpacing:3,opacity:.25,marginBottom:7}}>CUENTAS DEMO</div>
+            {ACCS.map(function(a){return (
+              <div key={a.id} onClick={function(){setUser(a.username);setPass(a.password);snd.click();}}
+                style={{display:'flex',justifyContent:'space-between',padding:'4px 7px',marginBottom:2,borderRadius:3,cursor:'pointer'}}
+                onMouseOver={function(e){e.currentTarget.style.background='#00ff2208';}}
+                onMouseOut={function(e){e.currentTarget.style.background='transparent';}}>
+                <span style={{fontSize:8,color:'#00ff22',opacity:.55}}>{a.username}</span>
+                <span style={{fontSize:8,color:RC[a.role],letterSpacing:2}}>{a.role}</span>
+                <span style={{fontSize:8,color:'#00ff22',opacity:.25}}>{a.password}</span>
+              </div>
+            );})}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App(){
+  const [cu,setCu]=useState(null);
+  const [rows,setRows]=useState(function(){return [];});
+  const [editPC,setEditPC]=useState(null);
+  const [histPC,setHistPC]=useState(null);
+  const [bajaPC,setBajaPC]=useState(null);
+  const [deleted,setDeleted]=useState([]);
+  const [delConfirm,setDelConfirm]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [drag,setDrag]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [logs,setLogs]=useState([{t:nowT(),msg:'Sistema iniciado',type:'ok'}]);
+  const [search,setSearch]=useState('');
+  const [filter,setFilter]=useState('ALL');
+  const [sfilt,setSfilt]=useState('ALL');
+  const [panel,setPanel]=useState('LOGS');
+  const [pinging,setPinging]=useState(false);
+  const [selIds,setSelIds]=useState(new Set());
+  const [time,setTime]=useState(nowT());
+  const toastRef=useRef(null);
+  const snd=useSound();
+
+  useEffect(function(){
+    var t=setInterval(function(){setTime(nowT());},1000);
+    return function(){clearInterval(t);};
+  },[]);
+
+  useEffect(function(){
+    var idx=0;
+    var t=setInterval(function(){
+      setRows(function(prev){
+        if(!prev.length)return prev;
+        var ri=idx%prev.length;idx++;
+        var next=prev.slice();
+        next[ri]=Object.assign({},next[ri],{pcs:next[ri].pcs.map(function(pc){
+          if(pc.status!=='ACTIVO')return pc;
+          return Object.assign({},pc,{ping:rndPing(),cpu:Math.min(100,Math.max(1,(pc.cpu+(Math.random()*8-4))|0)),ram:Math.min(100,Math.max(1,(pc.ram+(Math.random()*5-2))|0))});
+        })});
+        return next;
+      });
+    },800);
+    return function(){clearInterval(t);};
+  },[]);
+
+  function addLog(msg,type){
+    setLogs(function(p){return [{t:nowT(),msg:msg,type:type||'ok'},...p.slice(0,79)];});
+  }
+  function showToast(msg,type){
+    if(toastRef.current)clearTimeout(toastRef.current);
+    setToast({msg:msg,type:type||'ok'});
+    toastRef.current=setTimeout(function(){setToast(null);},2500);
+  }
+
+  var allPCs=useMemo(function(){return rows.flatMap(function(r){return r.pcs;});},[ rows]);
+  var activePCs=useMemo(function(){return allPCs.filter(function(p){return p.status!=='ELIMINADO';});},[ allPCs]);
+  var stats=useMemo(function(){
+    var act=activePCs.filter(function(p){return p.status==='ACTIVO';});
+    var wp=activePCs.filter(function(p){return p.ping;});
+    return {
+      total:activePCs.length,active:act.length,
+      maint:activePCs.filter(function(p){return p.status==='MANTENIMIENTO';}).length,
+      baja:activePCs.filter(function(p){return p.status==='BAJA';}).length,
+      elim:allPCs.filter(function(p){return p.status==='ELIMINADO';}).length,
+      alerts:activePCs.filter(function(p){return p.alerts&&p.alerts.length>0;}).length,
+      bl_si:activePCs.filter(function(p){return blNum(p.bitlocker)===1;}).length,
+      bl_no:activePCs.filter(function(p){return blNum(p.bitlocker)===0;}).length,
+      avgPing:wp.length?Math.round(wp.reduce(function(a,p){return a+p.ping;},0)/wp.length):0,
+      avgCPU:act.length?Math.round(act.reduce(function(a,p){return a+p.cpu;},0)/act.length):0,
+      avgRAM:act.length?Math.round(act.reduce(function(a,p){return a+p.ram;},0)/act.length):0,
+    };
+  },[allPCs,activePCs]);
+  var pct=Math.round(stats.active/Math.max(stats.total,1)*100);
+  var perms=cu?PERMS[cu.role]:{};
+
+  var filtRows=useMemo(function(){
+    if(filter==='ELIM'){
+      // Vista de eliminados: mostrar solo PCs/filas eliminadas
+      return rows.map(function(row){
+        var elimPCs=row.pcs.filter(function(pc){return pc.status==='ELIMINADO';});
+        if(search){var s=search.toLowerCase();elimPCs=elimPCs.filter(function(pc){return pc.name.toLowerCase().includes(s)||pc.ip.includes(s)||(pc.user||'').toLowerCase().includes(s);});}
+        return Object.assign({},row,{pcs:elimPCs});
+      }).filter(function(r){return r.pcs.length>0||r.eliminada;});
+    }
+    // Vista normal: nunca mostrar eliminados
+    return rows.map(function(row){
+      return Object.assign({},row,{pcs:row.pcs.filter(function(pc){
+        if(pc.status==='ELIMINADO')return false;
+        if(filter==='ONLINE'&&pc.status!=='ACTIVO')return false;
+        if(filter==='OFFLINE'&&pc.status==='ACTIVO')return false;
+        if(filter==='ALERT'&&!(pc.alerts&&pc.alerts.length))return false;
+        if(sfilt==='BL1'&&blNum(pc.bitlocker)!==1)return false;
+        if(sfilt==='BL0'&&blNum(pc.bitlocker)!==0)return false;
+        if(sfilt==='BL2'&&blNum(pc.bitlocker)!==2)return false;
+        if(sfilt!=='ALL'&&sfilt!=='BL0'&&sfilt!=='BL1'&&sfilt!=='BL2'&&pc.status!==sfilt)return false;
+        if(search){var s=search.toLowerCase();if(!pc.name.toLowerCase().includes(s)&&!pc.ip.includes(s)&&!(pc.user||'').toLowerCase().includes(s)&&!(pc.mac||'').toLowerCase().includes(s))return false;}
+        return true;
+      })});
+    }).filter(function(r){return r.pcs.length>0;});
+  },[rows,search,filter,sfilt]);
+
+  function handleLogin(acc){setCu(acc);addLog(acc.name+' inicio sesion ['+acc.role+']','ok');showToast('Bienvenido, '+acc.name);}
+  function handleLogout(){addLog(cu.name+' cerro sesion','warn');snd.logout();setCu(null);}
+
+  function handleSave(upd){
+    var old=allPCs.find(function(p){return p.id===upd.id;});
+    var changes=[];
+    if(old.name!==upd.name)changes.push({field:'Nombre',from:old.name,to:upd.name});
+    if(old.ip!==upd.ip)changes.push({field:'IP',from:old.ip,to:upd.ip});
+    if((old.mac||'')!==(upd.mac||''))changes.push({field:'MAC',from:old.mac||'--',to:upd.mac||'--'});
+    if(blNum(old.bitlocker)!==blNum(upd.bitlocker))changes.push({field:'BitLocker',from:BLLABEL[blNum(old.bitlocker)],to:BLLABEL[blNum(upd.bitlocker)]});
+    if(old.status!==upd.status)changes.push({field:'Estado',from:old.status,to:upd.status});
+    if(old.email!==upd.email)changes.push({field:'Correo',from:old.email||'--',to:upd.email||'--'});
+    if(old.office365!==upd.office365)changes.push({field:'Office365',from:String(old.office365),to:String(upd.office365)});
+    var entry=changes.length>0?{action:'EDITADO',changes:changes,user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}:null;
+    var final=entry?Object.assign({},upd,{history:[...upd.history,entry]}):upd;
+    setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){return pc.id===upd.id?final:pc;})});});});
+    setEditPC(null);
+    if(entry)addLog(cu.name+' edito '+upd.name,'ok');
+    showToast(upd.name+' guardado');
+  }
+
+  function handleDelete(id){
+    var pc=allPCs.find(function(p){return p.id===id;});
+    setDelConfirm({type:'pc',item:pc,onConfirm:function(reason,notes){
+      setDeleted(function(p){return [{id:uid(),tipo:'PC',nombre:pc.name,ip:pc.ip,dept:pc.dept,os:pc.os,motivo:reason,notas:notes,eliminadoPor:cu.name,rol:cu.role,at:nowDT()},...p];});
+      setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(p2){
+        if(p2.id!==id)return p2;
+        return Object.assign({},p2,{status:'ELIMINADO',ping:null,eliminadoPor:cu.name,eliminadoAt:nowDT(),eliminadoMotivo:reason,eliminadoNotas:notes});
+      })});});});
+      setEditPC(null);setDelConfirm(null);
+      addLog(cu.name+' ELIMINO '+pc.name+' ['+reason+']','warn');showToast('Eliminado','warn');snd.del();
+    }});
+  }
+
+  function handleBaja(reason){
+    var pc=bajaPC;
+    var entry={action:'DADO DE BAJA: '+reason,changes:[{field:'Estado',from:pc.status,to:'BAJA'},{field:'Motivo',from:'--',to:reason}],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()};
+    setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(p2){return p2.id===pc.id?Object.assign({},p2,{status:'BAJA',ping:null,bajaReason:reason,history:[...p2.history,entry]}):p2;})});});});
+    setDeleted(function(p){return [{id:uid(),tipo:'BAJA',nombre:pc.name,ip:pc.ip,dept:pc.dept,os:pc.os,motivo:reason,notas:'',eliminadoPor:cu.name,rol:cu.role,at:nowDT()},...p];});
+    setBajaPC(null);setEditPC(null);
+    addLog(cu.name+' BAJA '+pc.name+': '+reason,'warn');showToast(pc.name+' baja','warn');snd.warn();
+  }
+
+  function handleAddRows(qty,perRow){
+    setRows(function(prev){
+      var start=prev.length;
+      var newRows=Array.from({length:qty},function(_,ri){
+        return {id:uid(),label:'Fila '+(start+ri+1),pcs:Array.from({length:perRow},function(_,c){
+          return Object.assign(mkPC(start+ri,c),{addedBy:cu.username,addedAt:new Date().toISOString(),history:[{action:'CREADO',changes:[],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}]});
+        })};
+      });
+      return [...prev,...newRows];
+    });
+    setShowAdd(false);
+    addLog(cu.name+' creo '+qty+' fila(s) x '+perRow+' = '+(qty*perRow)+' PCs','ok');
+    showToast((qty*perRow)+' equipos creados');snd.ok();
+  }
+
+  function handleAddPC(rowId){
+    setRows(function(prev){
+      var ri=prev.findIndex(function(r){return r.id===rowId;}),ci=prev[ri].pcs.length;
+      var npc=Object.assign(mkPC(ri,ci),{id:uid(),name:'PC-'+String(ri+1).padStart(2,'0')+String(ci+1).padStart(2,'0'),ip:'192.168.'+String(ri+1)+'.'+String(ci+1),addedBy:cu.username,addedAt:new Date().toISOString(),history:[{action:'AGREGADO',changes:[],user:cu.name,role:cu.role,avatar:cu.avatar,at:nowDT()}]});
+      return prev.map(function(r,i){return i===ri?Object.assign({},r,{pcs:[...r.pcs,npc]}):r;});
+    });
+    addLog(cu.name+' agrego PC','ok');showToast('PC agregado');snd.ok();
+  }
+
+  function handleDelRow(rowId){
+    var row=rows.find(function(r){return r.id===rowId;});
+    setDelConfirm({type:'fila',item:row,onConfirm:function(reason,notes){
+      setDeleted(function(p){return [{id:uid(),tipo:'FILA',nombre:row.label,ip:'--',dept:'--',os:row.pcs.length+' PCs',motivo:reason,notas:notes,eliminadoPor:cu.name,rol:cu.role,at:nowDT()},...p];});
+      setRows(function(p){return p.map(function(r){
+        if(r.id!==rowId)return r;
+        return Object.assign({},r,{eliminada:true,eliminadaPor:cu.name,eliminadaAt:nowDT(),eliminadaMotivo:reason,eliminadaNotas:notes,
+          pcs:r.pcs.map(function(pc){return Object.assign({},pc,{status:'ELIMINADO',ping:null,eliminadoPor:cu.name,eliminadoAt:nowDT(),eliminadoMotivo:reason,eliminadoNotas:notes});})
+        });
+      });});
+      setDelConfirm(null);
+      addLog(cu.name+' elimino '+(row?row.label:rowId)+' ['+reason+']','warn');showToast('Fila eliminada','warn');snd.del();
+    }});
+  }
+
+  function handleRowPwr(rIdx,status){
+    setRows(function(p){return p.map(function(r,i){return i===rIdx?Object.assign({},r,{pcs:r.pcs.map(function(pc){return Object.assign({},pc,{status:status,ping:status==='ACTIVO'?rndPing():null});})}):r;});});
+    addLog(cu.name+': Fila '+(rIdx+1)+' -> '+status,'ok');snd.click();
+  }
+
+  function handlePingAll(){
+    setPinging(true);addLog(cu.name+' ping masivo','ok');snd.ping();
+    setTimeout(function(){
+      setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){return pc.status==='ACTIVO'?Object.assign({},pc,{ping:rndPing()}):pc;})});});});
+      addLog('Ping OK: '+stats.active+'/'+stats.total,'ok');showToast('Ping completado');snd.ok();setPinging(false);
+    },1400);
+  }
+
+  function handleDragStart(e,pc){setDrag(pc);e.dataTransfer.effectAllowed='move';}
+  function handleDrop(e,target){
+    e.preventDefault();if(!drag||drag.id===target.id)return;
+    setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){
+      if(pc.id===drag.id)return Object.assign({},pc,{name:target.name,ip:target.ip,status:target.status,user:target.user,ping:target.ping,cpu:target.cpu,ram:target.ram});
+      if(pc.id===target.id)return Object.assign({},pc,{name:drag.name,ip:drag.ip,status:drag.status,user:drag.user,ping:drag.ping,cpu:drag.cpu,ram:drag.ram});
+      return pc;
+    })});});});
+    addLog(cu.name+' movio '+drag.name+' - '+target.name,'ok');snd.move();setDrag(null);
+  }
+
+  function toggleSel(id){snd.click();setSelIds(function(p){var n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});}
+
+  if(!cu)return <Login onLogin={handleLogin} snd={snd}/>;
+
+  function fb(active,col){return {padding:'4px 10px',background:active?col+'15':'transparent',border:'1px solid '+(active?col+'70':col+'25'),color:active?col:col+'50',fontFamily:'monospace',fontSize:8,letterSpacing:2,cursor:'pointer',borderRadius:3,transition:'all .12s'};}
+
+  return (
+    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:'#020c04',fontFamily:"'Share Tech Mono',monospace",color:'#00ff22',overflow:'hidden',position:'relative'}}>
+      <MatrixRain opacity={.35}/>
+
+      <div style={{position:'relative',zIndex:10,background:'rgba(2,10,4,.97)',borderBottom:'1px solid #00ff2212',backdropFilter:'blur(4px)'}}>
+        <div style={{display:'flex',alignItems:'center',padding:'8px 18px',gap:14,flexWrap:'wrap'}}>
+          <div style={{flexShrink:0}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,letterSpacing:6,color:'#00ff22',textShadow:'0 0 18px #00ff22'}}>NETGRID</div>
+            <div style={{fontSize:7,letterSpacing:4,color:'#00ff22',opacity:.3}}>NETWORK ADMIN v6.0</div>
+          </div>
+          <div style={{width:1,height:32,background:'#00ff2210',flexShrink:0}}/>
+          <div style={{flexShrink:0,textAlign:'center'}}>
+            <div style={{fontFamily:"'Orbitron',monospace",fontSize:14,letterSpacing:3,color:'#00ff22'}}>{time}</div>
+            <div style={{fontSize:7,opacity:.3}}>{new Date().toLocaleDateString('es-MX')}</div>
+          </div>
+          <div style={{width:1,height:32,background:'#00ff2210',flexShrink:0}}/>
+          <div style={{display:'flex',gap:12,flex:1,flexWrap:'wrap'}}>
+            {[{l:'TOTAL',v:stats.total,c:'#00ff22'},{l:'ACTIVOS',v:stats.active,c:'#00ff22'},{l:'MANT',v:stats.maint,c:'#ffff00'},{l:'BAJA',v:stats.baja,c:'#ff2222'},{l:'ALERTAS',v:stats.alerts,c:'#ff8800'},{l:'BL ON',v:stats.bl_si,c:'#00ff22'},{l:'BL OFF',v:stats.bl_no,c:'#ff2222'},{l:'CPU',v:stats.avgCPU+'%',c:stats.avgCPU>80?'#ff2222':'#00ff22'},{l:'RAM',v:stats.avgRAM+'%',c:stats.avgRAM>80?'#ff2222':'#00aaff'},{l:'PING',v:stats.avgPing+'ms',c:stats.avgPing<30?'#00ff22':'#ffff00'}].map(function(item){return (
+              <div key={item.l} style={{textAlign:'center',minWidth:40}}>
+                <div style={{fontSize:6,letterSpacing:1,opacity:.3,marginBottom:1}}>{item.l}</div>
+                <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,color:item.c,textShadow:'0 0 5px '+item.c}}>{item.v}</div>
+              </div>
+            );})}
+          </div>
+          <div style={{flexShrink:0,minWidth:80}}>
+            <div style={{fontSize:6,opacity:.3,marginBottom:2,textAlign:'center'}}>DISPONIB.</div>
+            <div style={{height:4,background:'#0a1a0a',borderRadius:2,overflow:'hidden'}}>
+              <div style={{height:'100%',width:pct+'%',background:'linear-gradient(90deg,#0a2,#00ff22)',transition:'width .6s'}}/>
+            </div>
+            <div style={{fontSize:9,textAlign:'center',marginTop:1,color:'#00ff22',fontFamily:"'Orbitron',monospace"}}>{pct+'%'}</div>
+          </div>
+          <div style={{width:1,height:32,background:'#00ff2210',flexShrink:0}}/>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+            <div style={{width:30,height:30,borderRadius:'50%',background:RC[cu.role]+'18',border:'1.5px solid '+RC[cu.role],display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,color:RC[cu.role],fontWeight:700}}>{cu.avatar}</div>
+            <div>
+              <div style={{fontSize:9,color:RC[cu.role]}}>{cu.name}</div>
+              <div style={{fontSize:6,opacity:.35}}>{cu.role+' - '+cu.dept}</div>
+            </div>
+            <button onClick={handleLogout} style={{padding:'4px 9px',background:'transparent',border:'1px solid #ff222225',color:'#ff222250',fontFamily:'inherit',fontSize:9,cursor:'pointer',borderRadius:3}}
+              onMouseOver={function(e){e.target.style.borderColor='#ff2222';e.target.style.color='#ff2222';}}
+              onMouseOut={function(e){e.target.style.borderColor='#ff222225';e.target.style.color='#ff222250';}}>OFF</button>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',borderTop:'1px solid #00ff2208',gap:0,minHeight:34}}>
+          {/* Buscador fijo izquierda */}
+          <div style={{position:'relative',display:'flex',alignItems:'center',padding:'4px 10px 4px 14px',flexShrink:0,borderRight:'1px solid #00ff2210'}}>
+            <span style={{position:'absolute',left:18,fontSize:10,opacity:.3,pointerEvents:'none'}}>?</span>
+            <input placeholder="BUSCAR..." value={search} onChange={function(e){setSearch(e.target.value);}}
+              style={{background:'#0a160a',border:'1px solid #00ff2215',color:'#00ff22',fontFamily:'inherit',fontSize:9,padding:'4px 22px 4px 20px',borderRadius:4,outline:'none',width:150}}
+              onFocus={function(e){e.target.style.borderColor='#00ff22';}}
+              onBlur={function(e){e.target.style.borderColor='#00ff2215';}}/>
+            {search&&<span onClick={function(){setSearch('');}} style={{position:'absolute',right:18,cursor:'pointer',opacity:.4,fontSize:9,color:'#00ff22'}}>X</span>}
+          </div>
+          {/* Rail scrollable con todos los filtros */}
+          <div style={{flex:1,overflowX:'auto',overflowY:'hidden',display:'flex',alignItems:'center',gap:5,padding:'4px 10px',
+            scrollbarWidth:'none',msOverflowStyle:'none',cursor:'grab',userSelect:'none'}}
+            ref={function(el){
+              if(!el)return;
+              el.style.cssText+=';scrollbar-width:none';
+              var isDown=false,startX,scrollLeft;
+              el.onmousedown=function(e){isDown=true;el.style.cursor='grabbing';startX=e.pageX-el.offsetLeft;scrollLeft=el.scrollLeft;};
+              el.onmouseleave=function(){isDown=false;el.style.cursor='grab';};
+              el.onmouseup=function(){isDown=false;el.style.cursor='grab';};
+              el.onmousemove=function(e){if(!isDown)return;e.preventDefault();var x=e.pageX-el.offsetLeft;el.scrollLeft=scrollLeft-(x-startX);};
+            }}>
+            {/* Grupo: vista general */}
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              {[{f:'ALL',l:'TODOS'},{f:'ONLINE',l:'ON'},{f:'OFFLINE',l:'OFF'},{f:'ALERT',l:'ALERTA'}].map(function(item){return (
+                <button key={item.f} onClick={function(){setFilter(item.f);snd.click();}} style={fb(filter===item.f,'#00ff22')}>{item.l}</button>
+              );})}
+              <button onClick={function(){setFilter(function(p){return p==='ELIM'?'ALL':'ELIM';});snd.click();}}
+                style={{padding:'4px 10px',background:filter==='ELIM'?'#2a0000':'transparent',
+                  border:'1px solid '+(filter==='ELIM'?'#883333':'#55222230'),
+                  color:filter==='ELIM'?'#cc4444':'#552222',
+                  fontFamily:'monospace',fontSize:8,cursor:'pointer',borderRadius:3,letterSpacing:1,transition:'all .12s',flexShrink:0}}>
+                x DEL{stats.elim>0&&<span style={{fontSize:7,marginLeft:3}}>{' ('+stats.elim+')'}</span>}
+              </button>
+            </div>
+            <div style={{width:1,height:18,background:'#00ff2215',flexShrink:0,margin:'0 4px'}}/>
+            {/* Grupo: estado */}
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              {STLIST.map(function(st){return (
+                <button key={st} onClick={function(){setSfilt(function(p){return p===st?'ALL':st;});snd.click();}} style={Object.assign({},fb(sfilt===st,SC[st]),{flexShrink:0})}>{st}</button>
+              );})}
+            </div>
+            <div style={{width:1,height:18,background:'#00ff2215',flexShrink:0,margin:'0 4px'}}/>
+            {/* Grupo: BitLocker */}
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              {[[1,'BL:ON','#00ff22'],[0,'BL:OFF','#ff2222'],[2,'BL:?','#ffff00']].map(function(it){
+                var v=it[0],l=it[1],c=it[2],k='BL'+v;
+                return <button key={v} onClick={function(){setSfilt(function(p){return p===k?'ALL':k;});snd.click();}} style={Object.assign({},fb(sfilt===k,c),{flexShrink:0})}>{l}</button>;
+              })}
+            </div>
+            <div style={{width:1,height:18,background:'#00ff2215',flexShrink:0,margin:'0 4px'}}/>
+            {/* Ping */}
+            <button onClick={handlePingAll} disabled={pinging} style={{padding:'4px 12px',background:'#0a1a0a',border:'1px solid #00ff2225',color:'#00ff22',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:3,display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+              <span style={{display:'inline-block',animation:pinging?'spin .7s linear infinite':'none'}}>{pinging?'...':'O'}</span>PING
+            </button>
+          </div>
+          {/* Acciones fijas derecha */}
+          <div style={{display:'flex',gap:5,padding:'4px 10px',flexShrink:0,borderLeft:'1px solid #00ff2210'}}>
+            {perms.add&&<button onClick={function(){setShowAdd(true);snd.click();}} style={{padding:'4px 12px',background:'#0a1a0a',border:'1px solid #00ff2225',color:'#00ff22',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:3,whiteSpace:'nowrap'}}>+ FILAS</button>}
+            {selIds.size>0&&<React.Fragment>
+            <span style={{fontSize:8,color:'#00aaff'}}>{selIds.size+' SEL'}</span>
+            {perms.edit&&<React.Fragment>
+              <button onClick={function(){setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){return selIds.has(pc.id)?Object.assign({},pc,{status:'ACTIVO',ping:rndPing()}):pc;})});});});addLog(cu.name+' activo '+selIds.size+' PCs','ok');setSelIds(new Set());snd.ok();}} style={fb(false,'#00ff22')}>ON</button>
+              <button onClick={function(){setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){return selIds.has(pc.id)?Object.assign({},pc,{status:'MANTENIMIENTO',ping:null}):pc;})});});});addLog(cu.name+': '+selIds.size+' en MANT','ok');setSelIds(new Set());snd.warn();}} style={fb(false,'#ffff00')}>MANT</button>
+            </React.Fragment>}
+            {perms.del&&<button onClick={function(){
+  var pcsToDelete=allPCs.filter(function(pc){return selIds.has(pc.id);});
+  var fakeRow={label:selIds.size+' PCs seleccionadas',pcs:pcsToDelete};
+  setDelConfirm({type:'fila',item:fakeRow,onConfirm:function(reason,notes){
+    setDeleted(function(prev){
+      var entries=pcsToDelete.map(function(pc){return {id:uid(),tipo:'PC',nombre:pc.name,ip:pc.ip,dept:pc.dept,os:pc.os,motivo:reason,notas:notes,eliminadoPor:cu.name,rol:cu.role,at:nowDT()};});
+      return [...entries,...prev];
+    });
+    setRows(function(p){return p.map(function(row){return Object.assign({},row,{pcs:row.pcs.map(function(pc){
+      if(!selIds.has(pc.id))return pc;
+      return Object.assign({},pc,{status:'ELIMINADO',ping:null,eliminadoPor:cu.name,eliminadoAt:nowDT(),eliminadoMotivo:reason,eliminadoNotas:notes});
+    })});});});
+    addLog(cu.name+' elimino '+selIds.size+' PCs ['+reason+']','warn');
+    setSelIds(new Set());setDelConfirm(null);snd.del();
+  }});
+}} style={fb(false,'#ff2222')}>DEL</button>}
+            <button onClick={function(){setSelIds(new Set());}} style={{padding:'4px 8px',background:'transparent',border:'1px solid #222',color:'#444',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:3}}>X</button>
+          </React.Fragment>}
+          </div>
+        </div>
+      </div>
+
+      <div style={{flex:1,display:'flex',overflow:'hidden',position:'relative',zIndex:5}}>
+        <div style={{flex:1,overflowY:'auto',overflowX:'hidden',padding:'12px 16px'}}>
+          {filtRows.map(function(row){return (
+            <GridRow key={row.id} row={row} rIdx={rows.findIndex(function(r){return r.id===row.id;})} perms={perms} selIds={selIds} onEdit={setEditPC} onDragStart={handleDragStart} onDrop={handleDrop} onSel={toggleSel} onAddPC={handleAddPC} onDelRow={handleDelRow} onRowPwr={handleRowPwr} snd={snd}/>
+          );})}
+          {filtRows.length===0&&<div style={{textAlign:'center',padding:'60px 20px',opacity:.2,fontSize:11,letterSpacing:3}}>{search||filter!=='ALL'||sfilt!=='ALL'?'SIN RESULTADOS':'SIN FILAS - PRESIONA + FILAS'}</div>}
+        </div>
+
+        <div style={{width:250,borderLeft:'1px solid #00ff2212',background:'rgba(2,10,4,.96)',display:'flex',flexDirection:'column',flexShrink:0}}>
+          <div style={{display:'flex',borderBottom:'1px solid #00ff2212',flexShrink:0}}>
+            {['LOGS','STATS','MAPA','BAJAS'].map(function(t){return (
+              <button key={t} onClick={function(){setPanel(t);snd.click();}}
+                style={{flex:1,padding:'9px 0',background:panel===t?'#00ff2206':'transparent',border:'none',
+                  borderBottom:panel===t?'2px solid '+(t==='BAJAS'?'#ff2222':'#00ff22'):'2px solid transparent',
+                  color:panel===t?(t==='BAJAS'?'#ff2222':'#00ff22'):(t==='BAJAS'?'#ff222230':'#00ff2230'),
+                  fontFamily:'inherit',fontSize:7,letterSpacing:3,cursor:'pointer',transition:'all .15s'}}>
+                {t}{t==='BAJAS'&&deleted.length>0&&<span style={{marginLeft:3,fontSize:6,color:'#ff2222',fontWeight:700}}>({deleted.length})</span>}
+              </button>
+            );})}
+          </div>
+          {panel==='LOGS'&&<div style={{flex:1,overflowY:'auto',padding:'10px 12px'}}>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:9}}>AUDITORIA</div>
+            {logs.map(function(l,i){return (
+              <div key={i} style={{display:'flex',gap:6,marginBottom:6,opacity:Math.max(.15,1-i*.013),animation:i===0?'fadein .25s ease':'none'}}>
+                <span style={{color:'#00ff22',opacity:.25,whiteSpace:'nowrap',flexShrink:0,fontSize:7}}>{l.t}</span>
+                <span style={{fontSize:8,color:l.type==='warn'?'#ff8800':'#00ff22',wordBreak:'break-word'}}>{l.type==='warn'?'! ':''}{l.msg}</span>
+              </div>
+            );})}
+          </div>}
+          {panel==='STATS'&&<div style={{flex:1,overflowY:'auto',padding:'12px'}}>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:12}}>METRICAS</div>
+            {[{l:'DISPONIBILIDAD',v:pct+'%',c:'#00ff22',b:pct},{l:'CPU PROM',v:stats.avgCPU+'%',c:stats.avgCPU>80?'#ff2222':'#ffff00',b:stats.avgCPU},{l:'RAM PROM',v:stats.avgRAM+'%',c:stats.avgRAM>80?'#ff2222':'#00aaff',b:stats.avgRAM},{l:'PING PROM',v:stats.avgPing+'ms',c:stats.avgPing<30?'#00ff22':'#ffff00',b:Math.min(100,stats.avgPing)}].map(function(item){return (
+              <div key={item.l} style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <span style={{fontSize:7,opacity:.3}}>{item.l}</span>
+                  <span style={{fontSize:11,color:item.c,fontWeight:700}}>{item.v}</span>
+                </div>
+                <div style={{height:3,background:'#0a140a',borderRadius:2,overflow:'hidden'}}>
+                  <div style={{height:'100%',width:item.b+'%',background:item.c,borderRadius:2,transition:'width .8s'}}/>
+                </div>
+              </div>
+            );})}
+            <div style={{marginTop:14,padding:'10px',background:'#020c04',border:'1px solid #00ff2210',borderRadius:5}}>
+              <div style={{fontSize:6,opacity:.25,marginBottom:9}}>POR ESTADO</div>
+              {STLIST.map(function(st){var cnt=allPCs.filter(function(p){return p.status===st;}).length;var b2=Math.round(cnt/Math.max(allPCs.length,1)*100);return (
+                <div key={st} style={{marginBottom:7}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                    <span style={{fontSize:7,color:SC[st]}}>{st}</span>
+                    <span style={{fontSize:8,color:SC[st],fontWeight:700}}>{cnt}</span>
+                  </div>
+                  <div style={{height:3,background:'#0a140a',borderRadius:2,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:b2+'%',background:SC[st],transition:'width .5s'}}/>
+                  </div>
+                </div>
+              );})}
+            </div>
+          </div>}
+          {panel==='MAPA'&&<div style={{flex:1,overflowY:'auto',padding:'12px'}}>
+            <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:10}}>MAPA DE RED</div>
+            <div style={{fontSize:7,opacity:.2,marginBottom:10}}>{stats.total+' EQ - '+rows.length+' FILAS'}</div>
+            {rows.map(function(row){return (
+              <div key={row.id} style={{marginBottom:10}}>
+                <div style={{fontSize:6,opacity:.25,marginBottom:4}}>{row.label.toUpperCase()+' ('+row.pcs.length+')'}</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:2}}>
+                  {row.pcs.map(function(pc){return (
+                    <div key={pc.id} title={pc.name+' '+pc.ip+' '+pc.status}
+                      onClick={function(){setEditPC(pc);snd.click();}}
+                      style={{width:12,height:12,borderRadius:1,cursor:'pointer',background:SC[pc.status],boxShadow:pc.status==='ACTIVO'?'0 0 3px #00ff22':'none',opacity:pc.status==='ACTIVO'?1:.45,transition:'all .3s'}}/>
+                  );})}
+                </div>
+              </div>
+            );})}
+            <div style={{marginTop:10,padding:'8px',background:'#030e05',border:'1px solid #00ff2210',borderRadius:4}}>
+              {STLIST.map(function(st){return (
+                <div key={st} style={{display:'flex',alignItems:'center',gap:7,marginBottom:4}}>
+                  <div style={{width:9,height:9,borderRadius:1,background:SC[st]}}/>
+                  <span style={{fontSize:7,color:SC[st],opacity:.65}}>{st+' ('+allPCs.filter(function(p){return p.status===st;}).length+')'}</span>
+                </div>
+              );})}
+            </div>
+          </div>}
+          {panel==='BAJAS'&&<div style={{flex:1,overflowY:'auto',padding:'10px 12px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:9}}>
+              <div style={{fontSize:6,letterSpacing:3,opacity:.25}}>REGISTRO DE ELIMINADOS</div>
+              {deleted.length>0&&<button onClick={function(){if(window.confirm('Limpiar historial?')){setDeleted([]);}}}
+                style={{fontSize:6,color:'#ff222240',background:'transparent',border:'1px solid #ff222220',borderRadius:3,padding:'1px 6px',cursor:'pointer',fontFamily:'inherit'}}>LIMPIAR</button>}
+            </div>
+            {deleted.length===0&&<div style={{textAlign:'center',padding:'40px 10px',opacity:.2,fontSize:9,letterSpacing:2}}>SIN ELIMINACIONES</div>}
+            {deleted.map(function(d,i){return (
+              <div key={d.id} style={{marginBottom:8,padding:'8px 10px',background:'#0d0000',border:'1px solid #ff222220',borderRadius:5,animation:i===0?'fadein .25s ease':'none'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                  <span style={{fontSize:8,fontWeight:700,letterSpacing:1,padding:'1px 6px',borderRadius:3,
+                    background:d.tipo==='BAJA'?'#ff880018':d.tipo==='PC'?'#ff222218':'#aa000018',
+                    border:'1px solid '+(d.tipo==='BAJA'?'#ff880040':d.tipo==='PC'?'#ff222240':'#aa000040'),
+                    color:d.tipo==='BAJA'?'#ff8800':d.tipo==='PC'?'#ff2222':'#ff5555'}}>
+                    {d.tipo==='BAJA'?'BAJA':d.tipo==='PC'?'PC ELIMINADA':'FILA ELIMINADA'}
+                  </span>
+                  <span style={{fontSize:6,color:'#ff222250'}}>{d.at}</span>
+                </div>
+                <div style={{fontSize:9,color:'#ff8800',marginBottom:2,wordBreak:'break-all'}}>{d.nombre}</div>
+                {d.ip!=='--'&&<div style={{fontSize:7,color:'#ff222260',marginBottom:2}}>{d.ip}</div>}
+                <div style={{fontSize:7,color:'#ff222260',marginBottom:4}}>{d.os}{d.dept!=='--'?' | '+d.dept:''}</div>
+                <div style={{padding:'4px 7px',background:'#1a0000',border:'1px solid #ff222215',borderRadius:3,marginBottom:3}}>
+                  <div style={{fontSize:6,opacity:.4,marginBottom:1}}>MOTIVO</div>
+                  <div style={{fontSize:8,color:'#ff2222'}}>{d.motivo}</div>
+                  {d.notas&&<div style={{fontSize:7,color:'#ff8800',opacity:.7,marginTop:2}}>{d.notas}</div>}
+                </div>
+                <div style={{fontSize:6,color:'#ff222245'}}>{d.eliminadoPor} <span style={{color:'#ff222230'}}>[{d.rol}]</span></div>
+              </div>
+            );})}
+          </div>}
+        </div>
+      </div>
+
+      <div style={{position:'relative',zIndex:10,borderTop:'1px solid #00ff2210',background:'rgba(2,10,4,.97)',padding:'4px 18px',display:'flex',gap:16,alignItems:'center',fontSize:7,letterSpacing:2,color:'#00ff22',opacity:.4}}>
+        <span style={{animation:'pulse 1.5s infinite'}}>o</span>
+        <span>ACTIVO</span>
+        <span>{'ROL: '}<span style={{color:RC[cu.role]}}>{cu.role}</span></span>
+        <span>{'FILAS: '+rows.length}</span>
+        <span>{'TOTAL: '+stats.total}</span>
+        <span>{'ON: '+stats.active}</span>
+        <span>{'BAJA: '}<span style={{color:'#ff2222'}}>{stats.baja}</span></span>
+        <div style={{flex:1}}/>
+        {!perms.edit&&<span style={{color:'#ffff00'}}>SOLO LECTURA</span>}
+        <span style={{animation:'blink 1s infinite'}}>_</span>
+      </div>
+
+      {toast&&<div style={{position:'fixed',bottom:26,right:26,zIndex:5000,background:'rgba(3,14,5,.97)',border:'1px solid '+(toast.type==='warn'?'#ff2222':'#00ff22'),color:toast.type==='warn'?'#ff2222':'#00ff22',padding:'9px 20px',borderRadius:4,fontFamily:'inherit',fontSize:9,letterSpacing:2,animation:'fadein .2s ease'}}>
+        {toast.type==='warn'?'! ':''}{toast.msg.toUpperCase()}
+      </div>}
+
+      {editPC&&!bajaPC&&<PCModal pc={editPC} onClose={function(){setEditPC(null);}} onSave={handleSave} onDelete={handleDelete} onBaja={function(pc){setBajaPC(pc);}} onHist={setHistPC} cu={cu} snd={snd}/>}
+      {delConfirm&&<DelConfirmModal item={delConfirm.item} type={delConfirm.type} onClose={function(){setDelConfirm(null);}} onConfirm={delConfirm.onConfirm}/>}
+      {bajaPC&&<BajaModal pc={bajaPC} onClose={function(){setBajaPC(null);}} onConfirm={handleBaja}/>}
+      {histPC&&<HistModal pc={histPC} onClose={function(){setHistPC(null);}}/>}
+      {showAdd&&<AddModal onClose={function(){setShowAdd(false);}} onAdd={handleAddRows}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
