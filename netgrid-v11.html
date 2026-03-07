@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>NETGRID v6</title>
+<title>NETGRID</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -193,9 +193,9 @@ function PCCard(props){
       </svg>
       <div style={{fontSize:8,color:sc,marginTop:2,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center'}}>{pc.name}</div>
       <div style={{fontSize:7,color:'#0a2',opacity:.45,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{pc.ip}</div>
-      {pc.mac&&<div style={{fontSize:6,color:'#00ccff',opacity:.6,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center'}}>{pc.mac}</div>}
+      {pc.mac&&<div style={{fontSize:6,color:'#00ccff',opacity:.55,maxWidth:78,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textAlign:'center'}}>{pc.mac}</div>}
       <div style={{display:'flex',alignItems:'center',gap:3,marginTop:1}}>
-        <span style={{fontSize:8}}>{blNum(pc.bitlocker)===1?'🔒':blNum(pc.bitlocker)===0?'🔓':'❓'}</span>
+        <span style={{fontSize:8}}>{blNum(pc.bitlocker)===1?'[L]':blNum(pc.bitlocker)===0?'[U]':'[?]'}</span>
         <span style={{fontSize:6,color:BLC[blNum(pc.bitlocker)],fontWeight:700}}>{BLLABEL[blNum(pc.bitlocker)]}</span>
       </div>
       {pc.status==='ACTIVO'&&pc.ping&&<span style={{fontSize:7,color:pc.ping<20?'#00ff22':pc.ping<50?'#ffff00':'#ff8800'}}>{pc.ping}ms</span>}
@@ -346,6 +346,7 @@ function ItemList(props){
 
 function PCModal(props){
   const {pc,onClose,onSave,onDelete,onBaja,onHist,cu,snd}=props;
+  const [tab,setTab]=useState('info');
   const [d,setD]=useState(Object.assign({},pc,{
     winPass:pc.winPass||'',email:pc.email||'',emailPass:pc.emailPass||'',
     vpn:pc.vpn||{servidor:'',usuario:'',pass:'',protocolo:'OpenVPN'},
@@ -353,12 +354,12 @@ function PCModal(props){
     mac:pc.mac||'',bitlocker:blNum(pc.bitlocker),bl_key:pc.bl_key||'',
     ubicacion:pc.ubicacion||'',ultimo_mant:pc.ultimo_mant||'',
   }));
-  const [tab,setTab]=useState('info');
   const p=PERMS[cu.role];
   function s(k,v){setD(function(x){return Object.assign({},x,{[k]:v});});}
   function sv(k,v){setD(function(x){return Object.assign({},x,{vpn:Object.assign({},x.vpn,{[k]:v})});});}
   const inp={background:'#0a180a',border:'1px solid #00ff2218',color:'#00ff22',fontFamily:'monospace',fontSize:11,padding:'6px 9px',width:'100%',borderRadius:4,outline:'none',boxSizing:'border-box'};
   const sc=SC[d.status]||'#00ff22';
+  const bl=blNum(d.bitlocker);
 
   function F(label,val,key,ac){
     return (
@@ -372,41 +373,35 @@ function PCModal(props){
     );
   }
 
-  var tabs=[{id:'info',l:'INFO'},{id:'creds',l:'CREDS'},{id:'apps',l:'APPS'},{id:'log',l:'LOG'}];
-
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,8,2,.93)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,backdropFilter:'blur(8px)'}}>
-      <div style={{background:'#030e05',border:'1px solid #00ff2228',borderRadius:8,width:460,height:520,display:'flex',flexDirection:'column',fontFamily:'monospace',color:'#00ff22',boxShadow:'0 0 40px #00ff2208'}}>
+      <div style={{background:'#030e05',border:'1px solid #00ff2228',borderRadius:8,width:460,height:520,display:'flex',flexDirection:'column',fontFamily:'monospace',color:'#00ff22'}}>
 
-        {/* Header compacto */}
         <div style={{padding:'10px 14px 0',borderBottom:'1px solid #00ff2210',flexShrink:0}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:sc,boxShadow:'0 0 6px '+sc}}/>
+              <div style={{width:7,height:7,borderRadius:'50%',background:sc,boxShadow:'0 0 5px '+sc,flexShrink:0}}/>
               <span style={{fontSize:13,letterSpacing:2,fontWeight:700}}>{d.name}</span>
               <span style={{fontSize:7,padding:'2px 6px',background:sc+'15',border:'1px solid '+sc+'35',borderRadius:3,color:sc}}>{d.status}</span>
-              {blNum(d.bitlocker)===0&&<span style={{fontSize:7,color:'#ff2222',opacity:.8}}>🔓 SIN CIFRADO</span>}
+              {bl===0&&<span style={{fontSize:7,color:'#ff2222',opacity:.8}}>! SIN CIFRADO</span>}
             </div>
-            <div style={{display:'flex',gap:5}}>
-              {!p.edit&&<span style={{fontSize:6,color:'#ffff00',opacity:.6,letterSpacing:2,padding:'2px 6px',border:'1px solid #ffff0020',borderRadius:3}}>SOLO LECTURA</span>}
-              <button onClick={onClose} style={{padding:'2px 8px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:10,cursor:'pointer',borderRadius:3}}>X</button>
+            <div style={{display:'flex',gap:5,alignItems:'center'}}>
+              {!p.edit&&<span style={{fontSize:6,color:'#ffff00',opacity:.6,padding:'2px 6px',border:'1px solid #ffff0020',borderRadius:3}}>SOLO LECTURA</span>}
+              <button onClick={onClose} style={{padding:'2px 9px',background:'transparent',border:'1px solid #333',color:'#555',fontFamily:'inherit',fontSize:10,cursor:'pointer',borderRadius:3}}>X</button>
             </div>
           </div>
-          {/* Tabs */}
-          <div style={{display:'flex',gap:0}}>
-            {tabs.map(function(t){return (
-              <button key={t.id} onClick={function(){setTab(t.id);snd.click();}}
-                style={{flex:1,padding:'6px 0',background:'transparent',border:'none',borderBottom:tab===t.id?'2px solid #00ff22':'2px solid transparent',color:tab===t.id?'#00ff22':'#00ff2230',fontFamily:'monospace',fontSize:8,letterSpacing:2,cursor:'pointer',transition:'all .12s'}}>
-                {t.l}
+          <div style={{display:'flex'}}>
+            {[['info','INFO'],['creds','CREDS'],['apps','APPS'],['log','LOG']].map(function(t){return (
+              <button key={t[0]} onClick={function(){setTab(t[0]);snd.click();}}
+                style={{flex:1,padding:'6px 0',background:'transparent',border:'none',borderBottom:tab===t[0]?'2px solid #00ff22':'2px solid transparent',color:tab===t[0]?'#00ff22':'#00ff2230',fontFamily:'monospace',fontSize:8,letterSpacing:2,cursor:'pointer'}}>
+                {t[1]}
               </button>
             );})}
           </div>
         </div>
 
-        {/* Body por tab */}
         <div style={{flex:1,overflowY:'auto',padding:'12px 14px'}}>
 
-          {/* ── TAB INFO ── */}
           {tab==='info'&&<React.Fragment>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
               {F('NOMBRE',d.name,'name')}
@@ -431,13 +426,11 @@ function PCModal(props){
                   onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
               </div>
             </div>
-
-            {/* BitLocker */}
-            <div style={{padding:'8px 10px',background:'#060e06',border:'1px solid '+(BLC[blNum(d.bitlocker)]+'28'),borderRadius:6,marginBottom:10}}>
+            <div style={{padding:'8px 10px',background:'#060e06',border:'1px solid '+(BLC[bl]+'28'),borderRadius:5,marginBottom:8}}>
               <div style={{fontSize:6,letterSpacing:3,opacity:.3,marginBottom:6}}>BITLOCKER</div>
               <div style={{display:'flex',gap:5,marginBottom:7}}>
-                {[[1,'🔒 ACTIVO','#00ff22'],[0,'🔓 INACTIVO','#ff2222'],[2,'❓ DESCONOCIDO','#ffff00']].map(function(item){
-                  var v=item[0],l=item[1],c=item[2],active=blNum(d.bitlocker)===v;
+                {[[1,'BL:ON','#00ff22'],[0,'BL:OFF','#ff2222'],[2,'BL:?','#ffff00']].map(function(item){
+                  var v=item[0],l=item[1],c=item[2],active=bl===v;
                   return (
                     <button key={v} onClick={function(){if(p.edit)s('bitlocker',v);}} disabled={!p.edit}
                       style={{flex:1,padding:'5px 2px',background:active?c+'18':'transparent',border:'1.5px solid '+(active?c:c+'20'),color:active?c:c+'40',fontFamily:'monospace',fontSize:7,fontWeight:700,cursor:p.edit?'pointer':'not-allowed',borderRadius:3,transition:'all .12s'}}>
@@ -448,8 +441,6 @@ function PCModal(props){
               </div>
               <PwdField label="RECOVERY KEY" val={d.bl_key} onChange={function(e){s('bl_key',e.target.value);}} disabled={!p.edit} inp={Object.assign({},inp,{fontSize:10,letterSpacing:1})} ac="#00ff22"/>
             </div>
-
-            {/* Estado */}
             {p.edit&&<div style={{marginBottom:8}}>
               <div style={{fontSize:6,letterSpacing:2,opacity:.3,marginBottom:5}}>ESTADO</div>
               <div style={{display:'flex',gap:4}}>
@@ -461,7 +452,6 @@ function PCModal(props){
             </div>}
           </React.Fragment>}
 
-          {/* ── TAB CREDS ── */}
           {tab==='creds'&&<React.Fragment>
             <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>WINDOWS</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
@@ -473,20 +463,18 @@ function PCModal(props){
               <div>
                 <div style={{fontSize:7,letterSpacing:2,opacity:.35,marginBottom:3}}>EMAIL</div>
                 <input type="email" value={d.email||''} onChange={function(e){s('email',e.target.value);}} disabled={!p.edit}
-                  placeholder="user@empresa.com"
-                  style={Object.assign({},inp,{opacity:p.edit?1:.55})}
+                  placeholder="user@empresa.com" style={Object.assign({},inp,{opacity:p.edit?1:.55})}
                   onFocus={function(e){if(p.edit)e.target.style.borderColor='#ff8800';}}
                   onBlur={function(e){e.target.style.borderColor='#00ff2218';}}/>
               </div>
               <PwdField label="CONTRASENA EMAIL" val={d.emailPass} onChange={function(e){s('emailPass',e.target.value);}} disabled={!p.edit} inp={inp} ac="#ff8800"/>
             </div>
             <div onClick={function(){if(p.edit)s('office365',!d.office365);}}
-              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:d.office365?'#0a0a1a':'#050505',border:'1px solid '+(d.office365?'#00aaff30':'#222'),borderRadius:4,cursor:p.edit?'pointer':'default',userSelect:'none',marginBottom:14}}>
-              <div style={{width:16,height:16,borderRadius:3,border:'1.5px solid '+(d.office365?'#00aaff':'#333'),background:d.office365?'#00aaff22':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:10,color:'#00aaff'}}>
+              style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:d.office365?'#0a0a1a':'#050505',border:'1px solid '+(d.office365?'#00aaff30':'#222'),borderRadius:4,cursor:p.edit?'pointer':'default',userSelect:'none',marginBottom:14}}>
+              <div style={{width:15,height:15,borderRadius:3,border:'1.5px solid '+(d.office365?'#00aaff':'#333'),background:d.office365?'#00aaff22':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:10,color:'#00aaff'}}>
                 {d.office365&&'v'}
               </div>
-              <span style={{fontSize:8,color:d.office365?'#00aaff':'#444',letterSpacing:2}}>OFFICE 365</span>
-              {d.office365&&<span style={{marginLeft:'auto',fontSize:7,color:'#00aaff',opacity:.6}}>ACTIVO</span>}
+              <span style={{fontSize:8,color:d.office365?'#00aaff':'#444',letterSpacing:2}}>OFFICE 365 — {d.office365?'ACTIVO':'INACTIVO'}</span>
             </div>
             <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>VPN</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -515,7 +503,6 @@ function PCModal(props){
             </div>
           </React.Fragment>}
 
-          {/* ── TAB APPS ── */}
           {tab==='apps'&&<React.Fragment>
             <div style={{fontSize:6,letterSpacing:3,opacity:.25,marginBottom:8}}>CARPETAS COMPARTIDAS</div>
             <ItemList items={d.carpetas}
@@ -531,33 +518,31 @@ function PCModal(props){
               canEdit={p.edit} color="#00ff22" showCheck={false}/>
           </React.Fragment>}
 
-          {/* ── TAB LOG ── */}
           {tab==='log'&&<React.Fragment>
             {pc.history.length===0
               ?<div style={{textAlign:'center',padding:'40px 0',opacity:.2,fontSize:10,letterSpacing:2}}>SIN CAMBIOS</div>
               :[...pc.history].reverse().map(function(h,i){return (
                 <div key={i} style={{marginBottom:8,padding:'7px 10px',background:'#020c04',border:'1px solid #00ff2210',borderRadius:4}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
                     <span style={{fontSize:8,color:'#00aaff',fontWeight:700}}>{h.action}</span>
-                    <span style={{fontSize:7,opacity:.3}}>{h.at}</span>
+                    <span style={{fontSize:7,opacity:.3}}>{(h.at||'').slice(0,16)}</span>
                   </div>
-                  {h.changes&&h.changes.map(function(c,j){return (
+                  {(h.changes||[]).map(function(c,j){return (
                     <div key={j} style={{fontSize:7,opacity:.55,marginBottom:2}}>
                       <span style={{color:'#ffff00'}}>{c.field}</span>
-                      <span style={{opacity:.5}}>{': '}</span>
+                      <span style={{opacity:.4}}>{': '}</span>
                       <span style={{color:'#ff2222'}}>{c.from}</span>
                       <span style={{opacity:.4}}>{' > '}</span>
                       <span style={{color:'#00ff22'}}>{c.to}</span>
                     </div>
                   );})}
-                  <div style={{fontSize:6,opacity:.25,marginTop:3}}>{h.user} ({h.role})</div>
+                  <div style={{fontSize:6,opacity:.2,marginTop:3}}>{h.user} ({h.role})</div>
                 </div>
               );}
             }
           </React.Fragment>}
         </div>
 
-        {/* Footer */}
         <div style={{padding:'8px 14px',borderTop:'1px solid #00ff2210',display:'flex',gap:6,flexShrink:0,background:'#030e05'}}>
           {p.edit&&<button onClick={function(){onSave(d);snd.save();}}
             style={{flex:2,padding:'7px',background:'#0a1a0a',border:'1px solid #00ff22',color:'#00ff22',fontFamily:'inherit',fontSize:8,letterSpacing:3,cursor:'pointer',borderRadius:4}}
@@ -683,7 +668,7 @@ function Login(props){
       <div style={{position:'relative',zIndex:10,width:400}}>
         <div style={{textAlign:'center',marginBottom:36}}>
           <div style={{fontFamily:"'Orbitron',monospace",fontSize:30,fontWeight:900,letterSpacing:8,color:'#00ff22',textShadow:'0 0 30px #00ff22'}}>NETGRID</div>
-          <div style={{fontSize:8,letterSpacing:5,color:'#00ff22',opacity:.35,marginTop:4}}>NETWORK ADMIN v6.0</div>
+          <div style={{fontSize:8,letterSpacing:5,color:'#00ff22',opacity:.35,marginTop:4}}>NETWORK ADMIN v11.0</div>
         </div>
         <div style={{background:'rgba(3,14,5,.97)',border:'1px solid #00ff2220',borderRadius:12,padding:'32px 36px',backdropFilter:'blur(10px)'}}>
           <div style={{marginBottom:14}}>
@@ -785,11 +770,11 @@ function App(){
       maint:allPCs.filter(function(p){return p.status==='MANTENIMIENTO';}).length,
       baja:allPCs.filter(function(p){return p.status==='BAJA';}).length,
       alerts:allPCs.filter(function(p){return p.alerts&&p.alerts.length>0;}).length,
+      bl_si:allPCs.filter(function(p){return blNum(p.bitlocker)===1;}).length,
+      bl_no:allPCs.filter(function(p){return blNum(p.bitlocker)===0;}).length,
       avgPing:wp.length?Math.round(wp.reduce(function(a,p){return a+p.ping;},0)/wp.length):0,
       avgCPU:act.length?Math.round(act.reduce(function(a,p){return a+p.cpu;},0)/act.length):0,
       avgRAM:act.length?Math.round(act.reduce(function(a,p){return a+p.ram;},0)/act.length):0,
-      bl_si:allPCs.filter(function(p){return blNum(p.bitlocker)===1;}).length,
-      bl_no:allPCs.filter(function(p){return blNum(p.bitlocker)===0;}).length,
     };
   },[allPCs]);
   var pct=Math.round(stats.active/Math.max(stats.total,1)*100);
@@ -823,7 +808,6 @@ function App(){
     if(old.ip!==upd.ip)changes.push({field:'IP',from:old.ip,to:upd.ip});
     if((old.mac||'')!==(upd.mac||''))changes.push({field:'MAC',from:old.mac||'--',to:upd.mac||'--'});
     if(blNum(old.bitlocker)!==blNum(upd.bitlocker))changes.push({field:'BitLocker',from:BLLABEL[blNum(old.bitlocker)],to:BLLABEL[blNum(upd.bitlocker)]});
-    if((old.ubicacion||'')!==(upd.ubicacion||''))changes.push({field:'Ubicacion',from:old.ubicacion||'--',to:upd.ubicacion||'--'});
     if(old.status!==upd.status)changes.push({field:'Estado',from:old.status,to:upd.status});
     if(old.email!==upd.email)changes.push({field:'Correo',from:old.email||'--',to:upd.email||'--'});
     if(old.office365!==upd.office365)changes.push({field:'Office365',from:String(old.office365),to:String(upd.office365)});
@@ -918,7 +902,7 @@ function App(){
         <div style={{display:'flex',alignItems:'center',padding:'8px 18px',gap:14,flexWrap:'wrap'}}>
           <div style={{flexShrink:0}}>
             <div style={{fontFamily:"'Orbitron',monospace",fontSize:16,fontWeight:900,letterSpacing:6,color:'#00ff22',textShadow:'0 0 18px #00ff22'}}>NETGRID</div>
-            <div style={{fontSize:7,letterSpacing:4,color:'#00ff22',opacity:.3}}>NETWORK ADMIN v6.0</div>
+            <div style={{fontSize:7,letterSpacing:4,color:'#00ff22',opacity:.3}}>NETWORK ADMIN v11.0</div>
           </div>
           <div style={{width:1,height:32,background:'#00ff2210',flexShrink:0}}/>
           <div style={{flexShrink:0,textAlign:'center'}}>
@@ -927,7 +911,7 @@ function App(){
           </div>
           <div style={{width:1,height:32,background:'#00ff2210',flexShrink:0}}/>
           <div style={{display:'flex',gap:12,flex:1,flexWrap:'wrap'}}>
-            {[{l:'TOTAL',v:stats.total,c:'#00ff22'},{l:'ACTIVOS',v:stats.active,c:'#00ff22'},{l:'MANT',v:stats.maint,c:'#ffff00'},{l:'BAJA',v:stats.baja,c:'#ff2222'},{l:'BL✓',v:stats.bl_si,c:'#00ff22'},{l:'BL✗',v:stats.bl_no,c:'#ff2222'},{l:'CPU',v:stats.avgCPU+'%',c:stats.avgCPU>80?'#ff2222':'#00ff22'},{l:'PING',v:stats.avgPing+'ms',c:stats.avgPing<30?'#00ff22':'#ffff00'}].map(function(item){return (
+            {[{l:'TOTAL',v:stats.total,c:'#00ff22'},{l:'ACTIVOS',v:stats.active,c:'#00ff22'},{l:'MANT',v:stats.maint,c:'#ffff00'},{l:'BAJA',v:stats.baja,c:'#ff2222'},{l:'ALERTAS',v:stats.alerts,c:'#ff8800'},{l:'BL✓',v:stats.bl_si,c:'#00ff22'},{l:'BL✗',v:stats.bl_no,c:'#ff2222'},{l:'CPU',v:stats.avgCPU+'%',c:stats.avgCPU>80?'#ff2222':'#00ff22'},{l:'RAM',v:stats.avgRAM+'%',c:stats.avgRAM>80?'#ff2222':'#00aaff'},{l:'PING',v:stats.avgPing+'ms',c:stats.avgPing<30?'#00ff22':'#ffff00'}].map(function(item){return (
               <div key={item.l} style={{textAlign:'center',minWidth:40}}>
                 <div style={{fontSize:6,letterSpacing:1,opacity:.3,marginBottom:1}}>{item.l}</div>
                 <div style={{fontFamily:"'Orbitron',monospace",fontSize:13,fontWeight:700,color:item.c,textShadow:'0 0 5px '+item.c}}>{item.v}</div>
@@ -971,11 +955,9 @@ function App(){
             <button key={st} onClick={function(){setSfilt(function(p){return p===st?'ALL':st;});snd.click();}} style={fb(sfilt===st,SC[st])}>{st}</button>
           );})}
           <div style={{width:1,height:20,background:'#00ff2210'}}/>
-          <span style={{fontSize:6,opacity:.25,letterSpacing:1}}>BL</span>
-          {[[1,'🔒','#00ff22'],[0,'🔓','#ff2222'],[2,'❓','#ffff00']].map(function(item){
-            var v=item[0],icon=item[1],c=item[2],key='BL'+v;
-            return <button key={v} onClick={function(){setSfilt(function(p){return p===key?'ALL':key;});snd.click();}} style={fb(sfilt===key,c)}>{icon}</button>;
-          })}
+          <span style={{fontSize:6,opacity:.25,letterSpacing:1}}>BL:</span>
+          {[[1,'[L]','#00ff22'],[0,'[U]','#ff2222'],[2,'[?]','#ffff00']].map(function(item){var v=item[0],icon=item[1],c=item[2],key='BL'+v;return <button key={v} onClick={function(){setSfilt(function(p){return p===key?'ALL':key;});snd.click();}} style={fb(sfilt===key,c)}>{icon}</button>;})}
+          <div style={{width:1,height:20,background:'#00ff2210'}}/>
           <button onClick={handlePingAll} disabled={pinging} style={{padding:'4px 12px',background:'#0a1a0a',border:'1px solid #00ff2225',color:'#00ff22',fontFamily:'inherit',fontSize:8,cursor:'pointer',borderRadius:3,display:'flex',alignItems:'center',gap:4}}>
             <span style={{display:'inline-block',animation:pinging?'spin .7s linear infinite':'none'}}>{pinging?'...':'O'}</span>
             PING
