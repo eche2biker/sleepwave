@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#050a14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SleepWave" />
+  <title>SleepWave – Ruido Blanco</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Space+Mono:wght@400&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #050a14;
+      --deep: #020609;
+      --mid: #0d1b2e;
+      --accent: #4a9eff;
+      --accent2: #7b5ea7;
+      --glow: #1e4a8a;
+      --text: #c8ddf5;
+      --muted: #4a6a8a;
+      --card: rgba(13, 27, 46, 0.7);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Cormorant Garamond', serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* Stars */
+    .stars { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+    .star {
+      position: absolute; border-radius: 50%; background: white;
+      animation: twinkle var(--dur) ease-in-out infinite; opacity: 0;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.8); }
+      50% { opacity: var(--op); transform: scale(1); }
+    }
+
+    /* Moon */
+    .moon {
+      position: fixed; top: 40px; right: 40px;
+      width: 70px; height: 70px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #e8f4ff, #b8d4f0 60%, #8ab0d8);
+      box-shadow: 0 0 40px rgba(180,210,255,0.3), 0 0 80px rgba(100,160,255,0.15);
+      animation: moonFloat 8s ease-in-out infinite;
+      z-index: 1;
+    }
+    .moon::after {
+      content: ''; position: absolute; top: 12px; left: 18px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(100,140,180,0.3);
+      box-shadow: 20px 8px 0 rgba(100,140,180,0.2), 8px 28px 0 rgba(100,140,180,0.15);
+    }
+    @keyframes moonFloat {
+      0%,100% { transform: translateY(0) rotate(-5deg); }
+      50% { transform: translateY(-12px) rotate(5deg); }
+    }
+
+    /* Waves */
+    .wave-container {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 220px; pointer-events: none; overflow: hidden;
+    }
+    .wave {
+      position: absolute; bottom: 0; left: -100%;
+      width: 300%; height: 160px;
+      border-radius: 50% 50% 0 0 / 30% 30% 0 0;
+      opacity: 0.06; animation: waveMove linear infinite;
+      transition: opacity 1s ease;
+    }
+    .wave-1 { background: var(--accent); animation-duration: 12s; height: 120px; opacity: 0.07; }
+    .wave-2 { background: var(--accent2); animation-duration: 17s; animation-direction: reverse; height: 100px; opacity: 0.05; }
+    .wave-3 { background: var(--accent); animation-duration: 22s; height: 80px; opacity: 0.04; }
+    .wave.active { opacity: 0.18; }
+    .wave-2.active { opacity: 0.12; }
+    .wave-3.active { opacity: 0.09; }
+    @keyframes waveMove {
+      from { transform: translateX(0); }
+      to { transform: translateX(33.33%); }
+    }
+
+    /* ── APP SHELL ── */
+    .app {
+      position: relative; height: 100dvh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: max(env(safe-area-inset-top), 0px) 0 0;
+      z-index: 10; overflow: hidden;
+    }
+
+    /* Header */
+    header {
+      text-align: center; padding: 18px 20px 0; flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 2rem; font-weight: 300; letter-spacing: 0.25em;
+      color: #d4eaff; text-transform: uppercase;
+    }
+    header p {
+      font-family: 'Space Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; margin-top: 3px;
+    }
+
+    /* ── NAV TABS ── */
+    .nav-tabs {
+      display: flex; gap: 0; flex-shrink: 0;
+      background: rgba(5,10,20,0.8); backdrop-filter: blur(20px);
+      border: 1px solid rgba(74,158,255,0.12); border-radius: 50px;
+      padding: 4px; margin: 14px 20px 0;
+    }
+    .nav-tab {
+      background: transparent; border: none; border-radius: 50px;
+      padding: 7px 16px; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+      transition: all 0.3s ease; white-space: nowrap;
+    }
+    .nav-tab.active {
+      background: rgba(74,158,255,0.18); color: #a0d4ff;
+      box-shadow: 0 0 12px rgba(74,158,255,0.2);
+    }
+    .nav-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── PANELS ── */
+    .panel { display: none; flex: 1; width: 100%; overflow: hidden; flex-direction: column; align-items: center; }
+    .panel.visible { display: flex; }
+
+    /* ── SONIDOS PANEL ── */
+    .orb-section {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+    }
+    .orb-wrap {
+      position: relative; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .orb-ring {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(74,158,255,0.15);
+      animation: orbRing 4s ease-in-out infinite;
+    }
+    .orb-ring:nth-child(1) { width: 190px; height: 190px; animation-delay: 0s; }
+    .orb-ring:nth-child(2) { width: 228px; height: 228px; animation-delay: 0.5s; border-color: rgba(123,94,167,0.1); }
+    .orb-ring:nth-child(3) { width: 266px; height: 266px; animation-delay: 1s; border-color: rgba(74,158,255,0.07); }
+    @keyframes orbRing {
+      0%,100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.6; }
+    }
+    .orb {
+      width: 130px; height: 130px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #1e4a8a, #0d1b2e 60%, #050a14);
+      box-shadow: 0 0 60px rgba(74,158,255,0.2), inset 0 0 40px rgba(74,158,255,0.1);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: transform 0.3s ease, box-shadow 0.5s ease;
+      position: relative; z-index: 5;
+    }
+    .orb:active { transform: scale(0.95); }
+    .orb.playing {
+      box-shadow: 0 0 80px rgba(74,158,255,0.5), 0 0 120px rgba(74,158,255,0.2), inset 0 0 40px rgba(74,158,255,0.2);
+      animation: orbPulse 3s ease-in-out infinite;
+    }
+    @keyframes orbPulse {
+      0%,100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .orb-icon {
+      font-size: 2.6rem; transition: transform 0.3s ease;
+      filter: drop-shadow(0 0 10px rgba(74,158,255,0.5));
+    }
+    .orb.playing .orb-icon { animation: iconSpin 20s linear infinite; }
+    @keyframes iconSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .sound-name {
+      font-size: 1.2rem; font-weight: 300; letter-spacing: 0.15em;
+      color: #a0c4e8; text-align: center;
+    }
+
+    /* Category tabs */
+    .cat-tabs {
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+      padding: 0 16px; margin-bottom: 8px; flex-shrink: 0;
+    }
+    .cat-tab {
+      background: transparent; border: 1px solid rgba(74,158,255,0.12);
+      border-radius: 50px; padding: 5px 12px; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .cat-tab.active {
+      background: rgba(74,158,255,0.12); border-color: rgba(74,158,255,0.4); color: #80bfff;
+    }
+
+    /* Sound grid */
+    .sounds-grid {
+      display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+      padding: 0 14px; max-width: 440px; flex-shrink: 0;
+      max-height: 88px; overflow: hidden; transition: max-height 0.4s ease;
+    }
+    .sound-btn {
+      background: var(--card); border: 1px solid rgba(74,158,255,0.15);
+      border-radius: 50px; padding: 7px 16px; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+      transition: all 0.3s ease; backdrop-filter: blur(10px);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .sound-btn:hover { border-color: rgba(74,158,255,0.4); color: var(--text); }
+    .sound-btn.active {
+      background: rgba(74,158,255,0.15); border-color: rgba(74,158,255,0.6);
+      color: #a0d4ff; box-shadow: 0 0 15px rgba(74,158,255,0.2);
+    }
+    .sound-btn .btn-emoji { font-size: 0.9rem; }
+
+    /* Volume */
+    .controls { width: 100%; max-width: 320px; padding: 10px 20px 4px; flex-shrink: 0; }
+    .vol-label {
+      font-family: 'Space Mono', monospace; font-size: 0.58rem;
+      letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase;
+      margin-bottom: 8px; text-align: center;
+    }
+    .vol-wrap { display: flex; align-items: center; gap: 12px; }
+    .vol-icon { font-size: 1rem; opacity: 0.5; }
+    input[type=range] {
+      -webkit-appearance: none; flex: 1; height: 3px; border-radius: 10px;
+      background: linear-gradient(to right, var(--accent) var(--val, 70%), var(--mid) var(--val, 70%));
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: radial-gradient(circle, #7bc4ff, #4a9eff);
+      box-shadow: 0 0 10px rgba(74,158,255,0.5); cursor: pointer;
+    }
+
+    /* Timer */
+    .timer-section { padding: 0 0 6px; flex-shrink: 0; }
+    .timer-btns { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 0 16px; }
+    .timer-btn {
+      background: transparent; border: 1px solid rgba(74,158,255,0.15);
+      border-radius: 50px; padding: 5px 12px; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.08em; cursor: pointer; transition: all 0.3s ease;
+    }
+    .timer-btn.active {
+      background: rgba(123,94,167,0.2); border-color: rgba(123,94,167,0.6); color: #c8a8f0;
+    }
+    .timer-display {
+      text-align: center; font-family: 'Space Mono', monospace; font-size: 0.65rem;
+      color: rgba(123,94,167,0.8); margin-top: 6px; min-height: 14px; letter-spacing: 0.1em;
+    }
+
+    /* ── YOUTUBE PANEL ── */
+    .panel-inner {
+      width: 100%; flex: 1; overflow-y: auto; padding: 16px 16px 80px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .panel-inner::-webkit-scrollbar { width: 3px; }
+    .panel-inner::-webkit-scrollbar-thumb { background: rgba(74,158,255,0.2); border-radius: 10px; }
+
+    .section-title {
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.25em; color: var(--muted); text-transform: uppercase;
+      margin-bottom: 12px; padding-left: 2px;
+    }
+
+    /* Add video form */
+    .add-video-box {
+      background: var(--card); border: 1px solid rgba(74,158,255,0.15);
+      border-radius: 16px; padding: 14px 16px; margin-bottom: 18px;
+      backdrop-filter: blur(10px);
+    }
+    .add-video-box .input-row {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .yt-input {
+      flex: 1; background: rgba(5,10,20,0.8); border: 1px solid rgba(74,158,255,0.2);
+      border-radius: 50px; padding: 9px 14px; color: var(--text);
+      font-family: 'Space Mono', monospace; font-size: 0.65rem; outline: none;
+      letter-spacing: 0.04em;
+    }
+    .yt-input::placeholder { color: var(--muted); }
+    .yt-input:focus { border-color: rgba(74,158,255,0.5); }
+    .yt-add-btn {
+      background: rgba(74,158,255,0.2); border: 1px solid rgba(74,158,255,0.4);
+      border-radius: 50px; padding: 9px 16px; color: #a0d4ff;
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      cursor: pointer; transition: all 0.3s ease; white-space: nowrap;
+    }
+    .yt-add-btn:hover { background: rgba(74,158,255,0.3); }
+    .name-input {
+      width: 100%; background: rgba(5,10,20,0.6); border: none; border-top: 1px solid rgba(74,158,255,0.08);
+      padding: 8px 14px 0; color: var(--muted);
+      font-family: 'Space Mono', monospace; font-size: 0.6rem; outline: none;
+      letter-spacing: 0.04em; margin-top: 10px;
+    }
+    .name-input::placeholder { color: rgba(74,106,138,0.5); }
+
+    /* Playlist */
+    .playlist { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .playlist-item {
+      background: var(--card); border: 1px solid rgba(74,158,255,0.1);
+      border-radius: 14px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; transition: all 0.3s ease; backdrop-filter: blur(10px);
+    }
+    .playlist-item:hover { border-color: rgba(74,158,255,0.35); background: rgba(13,27,46,0.9); }
+    .playlist-item.playing-yt { border-color: rgba(255,80,80,0.5); background: rgba(30,10,10,0.7); }
+    .yt-thumb {
+      width: 54px; height: 38px; border-radius: 8px; object-fit: cover;
+      background: rgba(74,158,255,0.1); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; border: 1px solid rgba(74,158,255,0.15);
+    }
+    .yt-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+    .yt-info { flex: 1; min-width: 0; }
+    .yt-title {
+      font-size: 0.88rem; font-weight: 400; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 3px;
+    }
+    .yt-url {
+      font-family: 'Space Mono', monospace; font-size: 0.52rem;
+      color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .yt-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .yt-btn {
+      background: transparent; border: 1px solid rgba(74,158,255,0.15);
+      border-radius: 50%; width: 28px; height: 28px; display: flex;
+      align-items: center; justify-content: center; cursor: pointer;
+      font-size: 0.75rem; color: var(--muted); transition: all 0.25s ease;
+    }
+    .yt-btn:hover { border-color: rgba(74,158,255,0.4); color: var(--text); }
+    .yt-btn.del:hover { border-color: rgba(255,80,80,0.4); color: #ff8080; }
+    .empty-list {
+      text-align: center; padding: 30px 20px;
+      font-family: 'Space Mono', monospace; font-size: 0.6rem;
+      color: var(--muted); letter-spacing: 0.15em;
+    }
+    .empty-list .empty-icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.4; }
+
+    /* SoundCloud player */
+    .sc-player-wrap {
+      border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+      border: 1px solid rgba(255,85,0,0.25); background: #111;
+    }
+    .sc-player-wrap.hidden { display: none; }
+    .sc-player-wrap iframe { width: 100%; display: block; border: none; }
+    .sc-now-label {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 14px 9px;
+      font-family: 'Space Mono', monospace; font-size: 0.56rem;
+      color: rgba(255,120,50,0.85); letter-spacing: 0.08em;
+    }
+    .sc-now-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #ff5500;
+      animation: npBlink 1.2s ease-in-out infinite; flex-shrink: 0;
+    }
+    @keyframes npBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* SC volume control */
+    .sc-vol-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px 12px; border-top: 1px solid rgba(255,85,0,0.12);
+    }
+    .sc-vol-btn {
+      background: none; border: none; font-size: 1rem;
+      cursor: pointer; opacity: 0.6; transition: opacity 0.2s;
+      padding: 0; line-height: 1; flex-shrink: 0;
+    }
+    .sc-vol-btn:hover { opacity: 1; }
+    .sc-vol-track {
+      flex: 1; height: 4px; border-radius: 10px;
+      background: rgba(255,85,0,0.15); position: relative; cursor: pointer;
+    }
+    .sc-vol-fill {
+      position: absolute; left: 0; top: 0; height: 100%;
+      background: linear-gradient(to right, #ff5500, #ff8844);
+      border-radius: 10px; transition: width 0.1s;
+    }
+    .sc-vol-thumb {
+      position: absolute; top: 50%; transform: translate(-50%,-50%);
+      width: 14px; height: 14px; border-radius: 50%;
+      background: radial-gradient(circle, #ff8844, #ff5500);
+      box-shadow: 0 0 8px rgba(255,85,0,0.5);
+      transition: left 0.1s; pointer-events: none;
+    }
+    .sc-vol-num {
+      font-family: 'Space Mono', monospace; font-size: 0.55rem;
+      color: rgba(255,120,50,0.7); letter-spacing: 0.06em; width: 28px; text-align: right; flex-shrink: 0;
+    }
+
+    /* ── RECOMMENDATIONS PANEL ── */
+    .reco-grid { display: flex; flex-direction: column; gap: 12px; }
+    .reco-card {
+      background: var(--card); border: 1px solid rgba(74,158,255,0.1);
+      border-radius: 16px; padding: 14px 16px; cursor: pointer;
+      transition: all 0.3s ease; backdrop-filter: blur(10px);
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .reco-card:hover { border-color: rgba(74,158,255,0.35); transform: translateY(-1px); }
+    .reco-icon { font-size: 1.8rem; flex-shrink: 0; margin-top: 2px; }
+    .reco-body { flex: 1; }
+    .reco-title { font-size: 1rem; font-weight: 400; color: var(--text); margin-bottom: 4px; }
+    .reco-desc { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--muted); line-height: 1.6; letter-spacing: 0.04em; }
+    .reco-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+    .reco-tag {
+      background: rgba(74,158,255,0.08); border: 1px solid rgba(74,158,255,0.15);
+      border-radius: 50px; padding: 2px 8px;
+      font-family: 'Space Mono', monospace; font-size: 0.5rem;
+      color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .reco-action {
+      font-family: 'Space Mono', monospace; font-size: 0.55rem;
+      color: #4a9eff; letter-spacing: 0.1em; margin-top: 10px; text-transform: uppercase;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: rgba(13,27,46,0.95); border: 1px solid rgba(74,158,255,0.3);
+      border-radius: 50px; padding: 10px 20px;
+      font-family: 'Space Mono', monospace; font-size: 0.62rem;
+      color: #a0d4ff; letter-spacing: 0.1em;
+      opacity: 0; pointer-events: none; z-index: 100;
+      transition: all 0.3s ease; backdrop-filter: blur(20px);
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Scrollbar base */
+    .panel-inner { scrollbar-width: thin; scrollbar-color: rgba(74,158,255,0.2) transparent; }
+  </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="moon"></div>
+<div class="wave-container">
+  <div class="wave wave-1" id="w1"></div>
+  <div class="wave wave-2" id="w2"></div>
+  <div class="wave wave-3" id="w3"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="app">
+  <header>
+    <h1>SleepWave</h1>
+    <p>Ruido para dormir · Offline</p>
+  </header>
+
+  <!-- NAV TABS -->
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPanel('sonidos', this)">🎵 Sonidos</button>
+    <button class="nav-tab" onclick="showPanel('youtube', this)">🟠 SoundCloud</button>
+    <button class="nav-tab" onclick="showPanel('recos', this)">✦ Recomendaciones</button>
+  </div>
+
+  <!-- ══════════════════════ PANEL: SONIDOS ══════════════════════ -->
+  <div class="panel visible" id="panel-sonidos">
+
+    <div class="orb-section">
+      <div class="orb-wrap">
+        <div class="orb-ring"></div>
+        <div class="orb-ring"></div>
+        <div class="orb-ring"></div>
+        <div class="orb" id="mainOrb" onclick="togglePlay()">
+          <span class="orb-icon" id="orbIcon">🌙</span>
+        </div>
+      </div>
+      <div class="sound-name" id="soundName">Toca para reproducir</div>
+    </div>
+
+    <!-- Category filter -->
+    <div class="cat-tabs">
+      <button class="cat-tab active" onclick="filterCat(this,'all')">Todos</button>
+      <button class="cat-tab" onclick="filterCat(this,'ruido')">Ruido</button>
+      <button class="cat-tab" onclick="filterCat(this,'clima')">Clima</button>
+      <button class="cat-tab" onclick="filterCat(this,'maquina')">Máquina</button>
+      <button class="cat-tab" onclick="filterCat(this,'naturaleza')">Naturaleza</button>
+    </div>
+
+    <div class="sounds-grid" id="soundsGrid">
+      <!-- Ruido -->
+      <button class="sound-btn active" data-cat="ruido" data-sound="white" onclick="selectSound(this,'white')"><span class="btn-emoji">⚪</span>Blanco</button>
+      <button class="sound-btn" data-cat="ruido" data-sound="pink" onclick="selectSound(this,'pink')"><span class="btn-emoji">🌸</span>Rosa</button>
+      <button class="sound-btn" data-cat="ruido" data-sound="brown" onclick="selectSound(this,'brown')"><span class="btn-emoji">🍂</span>Marrón</button>
+      <button class="sound-btn" data-cat="ruido" data-sound="blue" onclick="selectSound(this,'blue')"><span class="btn-emoji">💙</span>Azul</button>
+      <!-- Clima -->
+      <button class="sound-btn" data-cat="clima" data-sound="rain" onclick="selectSound(this,'rain')"><span class="btn-emoji">🌧️</span>Lluvia</button>
+      <button class="sound-btn" data-cat="clima" data-sound="heavyrain" onclick="selectSound(this,'heavyrain')"><span class="btn-emoji">⛈️</span>Tormenta</button>
+      <button class="sound-btn" data-cat="clima" data-sound="thunder" onclick="selectSound(this,'thunder')"><span class="btn-emoji">🌩️</span>Truenos</button>
+      <button class="sound-btn" data-cat="clima" data-sound="wind" onclick="selectSound(this,'wind')"><span class="btn-emoji">🌬️</span>Viento</button>
+      <!-- Máquina -->
+      <button class="sound-btn" data-cat="maquina" data-sound="fan" onclick="selectSound(this,'fan')"><span class="btn-emoji">💨</span>Ventilador</button>
+      <button class="sound-btn" data-cat="maquina" data-sound="ac" onclick="selectSound(this,'ac')"><span class="btn-emoji">❄️</span>Aire Acond.</button>
+      <button class="sound-btn" data-cat="maquina" data-sound="airplane" onclick="selectSound(this,'airplane')"><span class="btn-emoji">✈️</span>Avión</button>
+      <button class="sound-btn" data-cat="maquina" data-sound="train" onclick="selectSound(this,'train')"><span class="btn-emoji">🚂</span>Tren</button>
+      <button class="sound-btn" data-cat="maquina" data-sound="vacuum" onclick="selectSound(this,'vacuum')"><span class="btn-emoji">🌀</span>Aspiradora</button>
+      <button class="sound-btn" data-cat="maquina" data-sound="dryer" onclick="selectSound(this,'dryer')"><span class="btn-emoji">🔄</span>Secadora</button>
+      <!-- Naturaleza -->
+      <button class="sound-btn" data-cat="naturaleza" data-sound="ocean" onclick="selectSound(this,'ocean')"><span class="btn-emoji">🌊</span>Océano</button>
+      <button class="sound-btn" data-cat="naturaleza" data-sound="river" onclick="selectSound(this,'river')"><span class="btn-emoji">🏞️</span>Río</button>
+      <button class="sound-btn" data-cat="naturaleza" data-sound="forest" onclick="selectSound(this,'forest')"><span class="btn-emoji">🌲</span>Bosque</button>
+      <button class="sound-btn" data-cat="naturaleza" data-sound="fire" onclick="selectSound(this,'fire')"><span class="btn-emoji">🔥</span>Chimenea</button>
+      <button class="sound-btn" data-cat="naturaleza" data-sound="crickets" onclick="selectSound(this,'crickets')"><span class="btn-emoji">🦗</span>Grillos</button>
+    </div>
+
+    <div class="controls">
+      <div class="vol-label">Volumen</div>
+      <div class="vol-wrap">
+        <span class="vol-icon">🔈</span>
+        <input type="range" min="0" max="100" value="70" id="volSlider" oninput="setVolume(this.value)" />
+        <span class="vol-icon">🔊</span>
+      </div>
+    </div>
+
+    <div class="timer-section">
+      <div class="timer-btns">
+        <button class="timer-btn" onclick="setTimer(this, 15)">15 min</button>
+        <button class="timer-btn" onclick="setTimer(this, 30)">30 min</button>
+        <button class="timer-btn" onclick="setTimer(this, 60)">1 hora</button>
+        <button class="timer-btn" onclick="setTimer(this, 120)">2 horas</button>
+        <button class="timer-btn" onclick="setTimer(this, 0)">∞</button>
+      </div>
+      <div class="timer-display" id="timerDisplay"></div>
+    </div>
+
+  </div><!-- /panel-sonidos -->
+
+
+  <!-- ══════════════════════ PANEL: SOUNDCLOUD ══════════════════════ -->
+  <div class="panel" id="panel-youtube">
+    <div class="panel-inner">
+
+      <div class="section-title">🟠 Mi Lista de SoundCloud</div>
+
+      <!-- Embedded player -->
+      <div class="sc-player-wrap hidden" id="scPlayerWrap">
+        <div class="sc-now-label">
+          <div class="sc-now-dot"></div>
+          <span id="scNowTitle">Reproduciendo...</span>
+        </div>
+        <iframe id="scIframe" height="166" scrolling="no" allow="autoplay"></iframe>
+        <!-- Volume control for SoundCloud -->
+        <div class="sc-vol-row">
+          <button class="sc-vol-btn" onclick="scVolStep(-10)">🔈</button>
+          <div class="sc-vol-track" onclick="scVolClick(event)">
+            <div class="sc-vol-fill" id="scVolFill" style="width:80%"></div>
+            <div class="sc-vol-thumb" id="scVolThumb" style="left:80%"></div>
+          </div>
+          <button class="sc-vol-btn" onclick="scVolStep(10)">🔊</button>
+          <span class="sc-vol-num" id="scVolNum">80%</span>
+        </div>
+      </div>
+
+      <!-- Add track -->
+      <div class="add-video-box">
+        <div class="input-row">
+          <input type="url" class="yt-input" id="ytUrlInput" placeholder="Pega un enlace de SoundCloud..." />
+          <button class="yt-add-btn" onclick="addScTrack()">+ Agregar</button>
+        </div>
+        <input type="text" class="name-input" id="ytNameInput" placeholder="Nombre del track (opcional)" />
+      </div>
+
+      <!-- Saved playlist -->
+      <div class="playlist" id="ytPlaylist">
+        <div class="empty-list" id="emptyList">
+          <div class="empty-icon">🎵</div>
+          <div>Agrega tracks de SoundCloud<br>y se reproducen aquí dentro</div>
+        </div>
+      </div>
+
+      <!-- Curated real suggestions -->
+      <div class="section-title" style="margin-top:4px">✦ Tracks reales — toca para reproducir ahora</div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="scSuggestions"></div>
+
+      <div style="margin-top:16px;padding:12px 14px;background:rgba(255,85,0,0.05);border:1px solid rgba(255,85,0,0.15);border-radius:12px">
+        <p style="font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);line-height:1.8;letter-spacing:0.04em">
+          💡 <strong style="color:rgba(255,120,50,0.7)">Cómo agregar tu propio track:</strong><br>
+          1. Ve a soundcloud.com y busca "white noise", "sleep sounds" o "rain"<br>
+          2. Copia la URL del track (ej: soundcloud.com/usuario/nombre-track)<br>
+          3. Pégala arriba y toca + Agregar
+        </p>
+      </div>
+
+    </div>
+  </div><!-- /panel-soundcloud -->
+
+
+  <!-- ══════════════════════ PANEL: RECOMENDACIONES ══════════════════════ -->
+  <div class="panel" id="panel-recos">
+    <div class="panel-inner">
+
+      <div class="section-title">✦ Guías para dormir mejor</div>
+      <div class="reco-grid">
+
+        <div class="reco-card">
+          <div class="reco-icon">😴</div>
+          <div class="reco-body">
+            <div class="reco-title">Método 4-7-8 para dormir</div>
+            <div class="reco-desc">Inhala 4 seg · retén 7 seg · exhala 8 seg. Activa el sistema parasimpático y reduce la ansiedad antes de dormir.</div>
+            <div class="reco-tags"><span class="reco-tag">Respiración</span><span class="reco-tag">Ansiedad</span><span class="reco-tag">5 min</span></div>
+          </div>
+        </div>
+
+        <div class="reco-card" onclick="selectSoundByName('rain'); showPanel('sonidos', document.querySelector('.nav-tab')); showToast('▶ Lluvia activada')">
+          <div class="reco-icon">🌧️</div>
+          <div class="reco-body">
+            <div class="reco-title">Lluvia para el sueño profundo</div>
+            <div class="reco-desc">El sonido de lluvia constante enmascara ruidos molestos y sincroniza las ondas cerebrales con el estado delta (sueño profundo).</div>
+            <div class="reco-tags"><span class="reco-tag">Sueño profundo</span><span class="reco-tag">Enmascaramiento</span></div>
+            <div class="reco-action">→ Activar lluvia</div>
+          </div>
+        </div>
+
+        <div class="reco-card" onclick="selectSoundByName('brown'); showPanel('sonidos', document.querySelector('.nav-tab')); showToast('▶ Ruido Marrón activado')">
+          <div class="reco-icon">🍂</div>
+          <div class="reco-body">
+            <div class="reco-title">Ruido Marrón vs Rosa vs Blanco</div>
+            <div class="reco-desc">El ruido marrón tiene más bajas frecuencias — ideal para quien le gusta el sonido de cascadas o viento fuerte. El rosa es más suave y natural. El blanco es el más denso.</div>
+            <div class="reco-tags"><span class="reco-tag">Comparativa</span><span class="reco-tag">Frecuencias</span></div>
+            <div class="reco-action">→ Probar ruido marrón</div>
+          </div>
+        </div>
+
+        <div class="reco-card">
+          <div class="reco-icon">🌡️</div>
+          <div class="reco-body">
+            <div class="reco-title">Temperatura ideal: 18–20 °C</div>
+            <div class="reco-desc">La ciencia del sueño recomienda mantener el cuarto entre 18 y 20 grados. Tu cuerpo necesita bajar su temperatura interna para entrar en sueño REM.</div>
+            <div class="reco-tags"><span class="reco-tag">Ciencia</span><span class="reco-tag">REM</span><span class="reco-tag">Entorno</span></div>
+          </div>
+        </div>
+
+        <div class="reco-card" onclick="selectSoundByName('fan'); showPanel('sonidos', document.querySelector('.nav-tab')); showToast('▶ Ventilador activado')">
+          <div class="reco-icon">💨</div>
+          <div class="reco-body">
+            <div class="reco-title">El ventilador: sonido + frescor</div>
+            <div class="reco-desc">El ruido constante de ventilador bloquea micro-despertares causados por sonidos del ambiente. Es uno de los favoritos para bebés y adultos con insomnio leve.</div>
+            <div class="reco-tags"><span class="reco-tag">Insomnio</span><span class="reco-tag">Bebés</span><span class="reco-tag">Popular</span></div>
+            <div class="reco-action">→ Activar ventilador</div>
+          </div>
+        </div>
+
+        <div class="reco-card" onclick="selectSoundByName('airplane'); showPanel('sonidos', document.querySelector('.nav-tab')); showToast('▶ Avión activado')">
+          <div class="reco-icon">✈️</div>
+          <div class="reco-body">
+            <div class="reco-title">Sonido de avión para dormir</div>
+            <div class="reco-desc">El zumbido de motor de avión es un ruido blanco de baja frecuencia que induce somnolencia rápidamente. Muchos viajeros frecuentes reportan dormirse mejor en vuelos largos.</div>
+            <div class="reco-tags"><span class="reco-tag">Somnolencia</span><span class="reco-tag">Motor</span><span class="reco-tag">Frecuencias bajas</span></div>
+            <div class="reco-action">→ Activar avión</div>
+          </div>
+        </div>
+
+        <div class="reco-card">
+          <div class="reco-icon">📵</div>
+          <div class="reco-body">
+            <div class="reco-title">Higiene digital antes de dormir</div>
+            <div class="reco-desc">Evita pantallas 60 min antes de dormir. La luz azul inhibe la melatonina. Usa SleepWave con pantalla apagada o en modo oscuro para un mejor descanso.</div>
+            <div class="reco-tags"><span class="reco-tag">Melatonina</span><span class="reco-tag">Luz azul</span><span class="reco-tag">Hábitos</span></div>
+          </div>
+        </div>
+
+        <div class="reco-card" onclick="selectSoundByName('ocean'); showPanel('sonidos', document.querySelector('.nav-tab')); showToast('▶ Océano activado')">
+          <div class="reco-icon">🌊</div>
+          <div class="reco-body">
+            <div class="reco-title">Ritmo de olas y el cerebro</div>
+            <div class="reco-desc">Las olas del océano tienen un ritmo natural de ~0.1 Hz que sincroniza con los ritmos corporales internos, induciendo un estado de calma profunda y reduciendo el cortisol.</div>
+            <div class="reco-tags"><span class="reco-tag">Cortisol</span><span class="reco-tag">Ritmo</span><span class="reco-tag">Relajación</span></div>
+            <div class="reco-action">→ Activar océano</div>
+          </div>
+        </div>
+
+        <div class="reco-card">
+          <div class="reco-icon">⏱️</div>
+          <div class="reco-body">
+            <div class="reco-title">El temporizador de 30 min</div>
+            <div class="reco-desc">Lo ideal es que el sonido se apague solo. Activa el temporizador de 30 min para que el sonido se detenga una vez que ya te hayas dormido y no interrumpa el sueño profundo.</div>
+            <div class="reco-tags"><span class="reco-tag">Truco</span><span class="reco-tag">Sueño profundo</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /panel-recos -->
+
+</div><!-- /app -->
+
+<script>
+  // ── Stars ────────────────────────────────────────────────────
+  const starsEl = document.getElementById('stars');
+  for(let i = 0; i < 130; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${Math.random()*4+2}s;--op:${Math.random()*0.7+0.2};animation-delay:${Math.random()*5}s;`;
+    starsEl.appendChild(s);
+  }
+
+  // ── Panel navigation ─────────────────────────────────────────
+  function showPanel(id, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-'+id).classList.add('visible');
+    // find correct button
+    document.querySelectorAll('.nav-tab').forEach(t => {
+      if (t.textContent.includes(id === 'sonidos' ? 'Sonidos' : id === 'youtube' ? 'SoundCloud' : 'Recom')) t.classList.add('active');
+    });
+    if(btn) btn.classList.add('active');
+  }
+
+  // ── Category filter ──────────────────────────────────────────
+  function filterCat(btn, cat) {
+    document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.sound-btn').forEach(b => {
+      if (cat === 'all' || b.dataset.cat === cat) {
+        b.style.display = '';
+      } else {
+        b.style.display = 'none';
+      }
+    });
+  }
+
+  // ── Toast ────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── Audio Engine ─────────────────────────────────────────────
+  let ctx, gainNode, sourceNode, isPlaying = false;
+  let currentSound = 'white';
+  let timerInterval = null, timerEnd = null;
+
+  const soundMeta = {
+    white:     { name: 'Ruido Blanco',    icon: '⚪' },
+    pink:      { name: 'Ruido Rosa',      icon: '🌸' },
+    brown:     { name: 'Ruido Marrón',    icon: '🍂' },
+    blue:      { name: 'Ruido Azul',      icon: '💙' },
+    rain:      { name: 'Lluvia suave',    icon: '🌧️' },
+    heavyrain: { name: 'Tormenta',        icon: '⛈️' },
+    thunder:   { name: 'Truenos',         icon: '🌩️' },
+    wind:      { name: 'Viento',          icon: '🌬️' },
+    fan:       { name: 'Ventilador',      icon: '💨' },
+    ac:        { name: 'Aire Acond.',     icon: '❄️' },
+    airplane:  { name: 'Avión',           icon: '✈️' },
+    train:     { name: 'Tren',            icon: '🚂' },
+    vacuum:    { name: 'Aspiradora',      icon: '🌀' },
+    dryer:     { name: 'Secadora',        icon: '🔄' },
+    ocean:     { name: 'Océano',          icon: '🌊' },
+    river:     { name: 'Río',             icon: '🏞️' },
+    forest:    { name: 'Bosque',          icon: '🌲' },
+    fire:      { name: 'Chimenea',        icon: '🔥' },
+    crickets:  { name: 'Grillos',         icon: '🦗' },
+  };
+
+  function initCtx() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = ctx.createGain();
+    gainNode.gain.value = 0.7;
+    gainNode.connect(ctx.destination);
+  }
+
+  function generateNoise(type) {
+    initCtx();
+    const sr = ctx.sampleRate;
+    const bufSize = sr * 4;
+    const buf = ctx.createBuffer(1, bufSize, sr);
+    const data = buf.getChannelData(0);
+
+    if (type === 'white') {
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1);
+
+    } else if (type === 'pink') {
+      let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+      for (let i = 0; i < bufSize; i++) {
+        const w = Math.random()*2-1;
+        b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+        b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+        b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+        data[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11; b6=w*0.115926;
+      }
+    } else if (type === 'brown') {
+      let last = 0;
+      for (let i = 0; i < bufSize; i++) {
+        const w = Math.random()*2-1;
+        data[i] = (last + 0.02*w) / 1.02;
+        last = data[i]; data[i] *= 3.5;
+      }
+    } else if (type === 'blue') {
+      // High-frequency emphasis (derivative of white)
+      let prev = 0;
+      for (let i = 0; i < bufSize; i++) {
+        const w = Math.random()*2-1;
+        data[i] = (w - prev) * 0.5;
+        prev = w;
+      }
+    } else if (type === 'rain') {
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random()*2-1)*0.12;
+        if (Math.random() < 0.003) {
+          const len = Math.floor(Math.random()*200+50);
+          for (let j=0; j<len && i+j<bufSize; j++)
+            data[i+j] += Math.sin(j*0.3)*Math.exp(-j*0.03)*0.5;
+        }
+      }
+    } else if (type === 'heavyrain') {
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random()*2-1)*0.3;
+        if (Math.random() < 0.008) {
+          const len = Math.floor(Math.random()*300+100);
+          for (let j=0; j<len && i+j<bufSize; j++)
+            data[i+j] += Math.sin(j*0.2)*Math.exp(-j*0.015)*0.7;
+        }
+      }
+    } else if (type === 'thunder') {
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random()*2-1)*0.08;
+        if (Math.random() < 0.0003) {
+          const len = Math.floor(Math.random()*3000+1000);
+          const intensity = Math.random()*0.8+0.4;
+          for (let j=0; j<len && i+j<bufSize; j++) {
+            const env = Math.exp(-j*0.002)*intensity;
+            data[i+j] += (Math.random()*2-1)*env;
+          }
+        }
+      }
+    } else if (type === 'wind') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const mod = Math.sin(2*Math.PI*0.08*t)*0.4 + Math.sin(2*Math.PI*0.03*t)*0.3 + 0.7;
+        data[i] = (Math.random()*2-1)*mod*0.6;
+      }
+    } else if (type === 'fan') {
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1)*0.7;
+    } else if (type === 'ac') {
+      // Low steady hum
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        data[i] = (Math.random()*2-1)*0.5 + Math.sin(2*Math.PI*60*t)*0.05 + Math.sin(2*Math.PI*120*t)*0.03;
+      }
+    } else if (type === 'airplane') {
+      // Deep steady roar
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        data[i] = (Math.random()*2-1)*0.8 + Math.sin(2*Math.PI*90*t)*0.1 + Math.sin(2*Math.PI*45*t)*0.15;
+      }
+    } else if (type === 'train') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const rhythm = Math.abs(Math.sin(2*Math.PI*1.8*t)) * 0.3;
+        data[i] = (Math.random()*2-1)*0.4 + Math.sin(2*Math.PI*80*t)*0.06 + rhythm*(Math.random()*2-1)*0.3;
+      }
+    } else if (type === 'vacuum') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        data[i] = (Math.random()*2-1)*0.9 + Math.sin(2*Math.PI*200*t)*0.08;
+      }
+    } else if (type === 'dryer') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const tumble = Math.sin(2*Math.PI*1.2*t)*0.1;
+        data[i] = (Math.random()*2-1)*0.5 + tumble*(Math.random()*2-1)*0.3 + Math.sin(2*Math.PI*55*t)*0.05;
+      }
+    } else if (type === 'ocean') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const wave = Math.sin(2*Math.PI*0.15*t)*0.5+0.5;
+        data[i] = (Math.random()*2-1)*wave*0.8;
+      }
+    } else if (type === 'river') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const flow = Math.sin(2*Math.PI*0.4*t)*0.2 + Math.sin(2*Math.PI*0.7*t)*0.15 + 0.7;
+        data[i] = (Math.random()*2-1)*flow*0.5;
+      }
+    } else if (type === 'forest') {
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random()*2-1)*0.06;
+        if (Math.random() < 0.001) {
+          const freq = 800+Math.random()*1200;
+          const len = Math.floor(Math.random()*400+100);
+          for (let j=0; j<len && i+j<bufSize; j++) {
+            const t2 = j/sr;
+            data[i+j] += Math.sin(2*Math.PI*freq*t2)*Math.exp(-j*0.015)*0.25;
+          }
+        }
+      }
+    } else if (type === 'fire') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const flicker = Math.sin(2*Math.PI*5*t)*0.1 + Math.sin(2*Math.PI*13*t)*0.08 + 0.6;
+        data[i] = (Math.random()*2-1)*flicker*0.35;
+        if (Math.random() < 0.004) {
+          const len = Math.floor(Math.random()*150+30);
+          for (let j=0; j<len && i+j<bufSize; j++)
+            data[i+j] += (Math.random()*2-1)*Math.exp(-j*0.08)*0.5;
+        }
+      }
+    } else if (type === 'crickets') {
+      for (let i = 0; i < bufSize; i++) {
+        const t = i/sr;
+        const chirp = Math.sin(2*Math.PI*4200*t) * Math.sin(2*Math.PI*18*t);
+        data[i] = chirp * 0.15 + (Math.random()*2-1)*0.04;
+      }
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+
+    // Filters per sound type
+    const filters = {
+      fan:      { type:'bandpass', freq:1200, Q:0.5 },
+      ac:       { type:'lowpass',  freq:400  },
+      airplane: { type:'lowpass',  freq:600  },
+      train:    { type:'lowpass',  freq:700  },
+      vacuum:   { type:'bandpass', freq:1600, Q:0.3 },
+      dryer:    { type:'lowpass',  freq:500  },
+      ocean:    { type:'lowpass',  freq:800  },
+      river:    { type:'lowpass',  freq:2000 },
+      wind:     { type:'lowpass',  freq:1200 },
+      thunder:  { type:'lowpass',  freq:500  },
+      heavyrain:{ type:'lowpass',  freq:3000 },
+      forest:   { type:'highpass', freq:400  },
+      crickets: { type:'bandpass', freq:4200, Q:2  },
+    };
+
+    if (filters[type]) {
+      const f = ctx.createBiquadFilter();
+      f.type = filters[type].type;
+      f.frequency.value = filters[type].freq;
+      if (filters[type].Q) f.Q.value = filters[type].Q;
+      src.connect(f); f.connect(gainNode);
+    } else {
+      src.connect(gainNode);
+    }
+    return src;
+  }
+
+  function togglePlay() {
+    if (isPlaying) stopSound(); else startSound();
+  }
+
+  function startSound() {
+    initCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    if (sourceNode) { try { sourceNode.stop(); } catch(e){} }
+    sourceNode = generateNoise(currentSound);
+    sourceNode.start();
+    isPlaying = true;
+    updateUI();
+  }
+
+  function stopSound() {
+    if (sourceNode) { try { sourceNode.stop(); } catch(e){} sourceNode = null; }
+    isPlaying = false;
+    updateUI();
+    clearTimerInterval();
+  }
+
+  function selectSound(btn, sound) {
+    currentSound = sound;
+    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('soundName').textContent = soundMeta[sound].name;
+    document.getElementById('orbIcon').textContent = soundMeta[sound].icon;
+    if (isPlaying) startSound();
+    showToast('▶ ' + soundMeta[sound].name);
+  }
+
+  function selectSoundByName(sound) {
+    currentSound = sound;
+    document.querySelectorAll('.sound-btn').forEach(b => {
+      if (b.dataset.sound === sound) b.classList.add('active');
+      else b.classList.remove('active');
+    });
+    document.getElementById('soundName').textContent = soundMeta[sound].name;
+    document.getElementById('orbIcon').textContent = soundMeta[sound].icon;
+    startSound();
+  }
+
+  function setVolume(val) {
+    if (gainNode) gainNode.gain.setTargetAtTime(val/100, ctx?.currentTime||0, 0.05);
+    document.getElementById('volSlider').style.setProperty('--val', val+'%');
+  }
+
+  function updateUI() {
+    const orb = document.getElementById('mainOrb');
+    const name = document.getElementById('soundName');
+    const waves = document.querySelectorAll('.wave');
+    if (isPlaying) {
+      orb.classList.add('playing');
+      name.textContent = soundMeta[currentSound].name;
+      waves.forEach(w => w.classList.add('active'));
+    } else {
+      orb.classList.remove('playing');
+      name.textContent = 'Toca para reproducir';
+      waves.forEach(w => w.classList.remove('active'));
+    }
+  }
+
+  // ── Timer ─────────────────────────────────────────────────────
+  function setTimer(btn, minutes) {
+    clearTimerInterval();
+    document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (minutes === 0) {
+      document.getElementById('timerDisplay').textContent = 'Sin límite';
+      return;
+    }
+    timerEnd = Date.now() + minutes * 60000;
+    updateTimerDisplay();
+    timerInterval = setInterval(() => {
+      if (Date.now() >= timerEnd) {
+        stopSound();
+        clearTimerInterval();
+        document.getElementById('timerDisplay').textContent = 'Temporizador finalizado';
+        showToast('⏹ Sonido apagado');
+      } else { updateTimerDisplay(); }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const rem = Math.max(0, timerEnd - Date.now());
+    const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
+    document.getElementById('timerDisplay').textContent = `Apagado en ${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  function clearTimerInterval() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerEnd = null;
+  }
+
+  // ── SoundCloud Playlist ───────────────────────────────────────
+  const SC_SUGGESTIONS = [
+    { url:'https://soundcloud.com/relaxing-white-noise/perfect-rain-sounds-for-sleep',        name:'🌧️ Lluvia suave – 75 min',         sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/epic-rain-and-thunder-5-hours',        name:'⛈️ Lluvia + Truenos – 5 horas',     sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/ocean-waves-for-deep-sleep-75-minutes',name:'🌊 Olas del océano – 75 min',        sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/fan-noise-for-sleeping',               name:'💨 Ventilador para dormir – 75 min', sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/fan-white-noise-5-hours',              name:'💨 Ventilador – 5 horas',            sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/fireplace-burning-sounds-75-minutes',  name:'🔥 Chimenea crepitando – 75 min',   sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/relaxing-rainstorm-asmr-for-you-to-sleep-or-study-75-minutes', name:'🌧️🔥 Lluvia + Chimenea – 75 min', sub:'Relaxing White Noise' },
+    { url:'https://soundcloud.com/relaxing-white-noise/rain-in-the-woods-sleep-sound-5-hours',name:'🌲 Lluvia en el bosque – 5 horas',   sub:'Relaxing White Noise' },
+  ];
+
+  let scList = JSON.parse(localStorage.getItem('sw_sclist') || '[]');
+  let currentScUrl = null;
+
+  function scEmbedUrl(trackUrl) {
+    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&color=%234a9eff&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false`;
+  }
+
+  function saveScList() {
+    try { localStorage.setItem('sw_sclist', JSON.stringify(scList)); } catch(e){}
+  }
+
+  function renderSuggestions() {
+    const el = document.getElementById('scSuggestions');
+    el.innerHTML = '';
+    SC_SUGGESTIONS.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'reco-card';
+      div.style.cssText = 'padding:10px 14px;cursor:pointer';
+      div.onclick = () => playScDirect(s.url, s.name);
+      div.innerHTML = `
+        <span style="font-size:1.3rem">${s.name.split(' ')[0]}</span>
+        <div>
+          <div class="yt-title">${escHtml(s.name.substring(s.name.indexOf(' ')+1))}</div>
+          <div class="yt-url">soundcloud.com · ${escHtml(s.sub)}</div>
+        </div>`;
+      el.appendChild(div);
+    });
+  }
+
+  function renderPlaylist() {
+    const container = document.getElementById('ytPlaylist');
+    const empty = document.getElementById('emptyList');
+    if (scList.length === 0) {
+      empty.style.display = '';
+      [...container.children].forEach(c => { if (c !== empty) c.remove(); });
+      return;
+    }
+    empty.style.display = 'none';
+    [...container.children].forEach(c => { if (c !== empty) c.remove(); });
+    scList.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'playlist-item' + (currentScUrl === item.url ? ' playing-yt' : '');
+      div.onclick = () => playSc(item.url, item.name);
+      div.innerHTML = `
+        <div class="yt-thumb" style="background:rgba(255,85,0,0.1);border-color:rgba(255,85,0,0.2);font-size:1.3rem">🎵</div>
+        <div class="yt-info">
+          <div class="yt-title">${escHtml(item.name)}</div>
+          <div class="yt-url">soundcloud.com</div>
+        </div>
+        <div class="yt-actions">
+          <button class="yt-btn" style="border-color:rgba(255,85,0,0.25);color:rgba(255,85,0,0.8)" onclick="event.stopPropagation();playSc('${escHtml(item.url)}','${escHtml(item.name)}')">▶</button>
+          <button class="yt-btn del" onclick="event.stopPropagation();removeSc(${idx})">✕</button>
+        </div>`;
+      container.appendChild(div);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function addScTrack() {
+    const url = document.getElementById('ytUrlInput').value.trim();
+    const name = document.getElementById('ytNameInput').value.trim();
+    if (!url) { showToast('⚠ Pega un enlace de SoundCloud'); return; }
+    if (!url.includes('soundcloud.com')) { showToast('⚠ Solo funciona con SoundCloud'); return; }
+    if (scList.find(v => v.url === url)) { showToast('⚠ Ya está en la lista'); return; }
+    scList.push({ url, name: name || 'Track ' + (scList.length+1) });
+    saveScList();
+    renderPlaylist();
+    document.getElementById('ytUrlInput').value = '';
+    document.getElementById('ytNameInput').value = '';
+    showToast('✓ Track agregado');
+  }
+
+  function removeSc(idx) {
+    if (scList[idx] && currentScUrl === scList[idx].url) {
+      document.getElementById('scPlayerWrap').classList.add('hidden');
+      currentScUrl = null;
+    }
+    scList.splice(idx, 1);
+    saveScList();
+    renderPlaylist();
+    showToast('🗑 Eliminado');
+  }
+
+  function playSc(url, name) {
+    currentScUrl = url;
+    if (isPlaying) stopSound();
+    const wrap = document.getElementById('scPlayerWrap');
+    const iframe = document.getElementById('scIframe');
+    document.getElementById('scNowTitle').textContent = name || 'SoundCloud';
+    iframe.src = scEmbedUrl(url);
+    wrap.classList.remove('hidden');
+    renderPlaylist();
+    // Load SC Widget API once
+    if (!window.SC) {
+      const s = document.createElement('script');
+      s.src = 'https://w.soundcloud.com/player/api.js';
+      s.onload = initScWidget;
+      document.head.appendChild(s);
+    } else { initScWidget(); }
+    showToast('▶ ' + (name || 'Reproduciendo...'));
+  }
+
+  function playScDirect(url, name) {
+    playSc(url, name);
+  }
+
+  // SC volume control via SoundCloud Widget API
+  let scVolume = 80;
+  let scWidget = null;
+
+  function scApplyVolume(val) {
+    scVolume = Math.max(0, Math.min(100, val));
+    document.getElementById('scVolFill').style.width = scVolume + '%';
+    document.getElementById('scVolThumb').style.left = scVolume + '%';
+    document.getElementById('scVolNum').textContent = scVolume + '%';
+    // Apply via SC Widget API if loaded
+    if (scWidget) {
+      try { scWidget.setVolume(scVolume); } catch(e){}
+    }
+  }
+
+  function scVolStep(delta) { scApplyVolume(scVolume + delta); }
+
+  function scVolClick(e) {
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+    const pct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    scApplyVolume(pct);
+  }
+
+  // Init SC Widget API after iframe loads
+  function initScWidget() {
+    const iframe = document.getElementById('scIframe');
+    if (!iframe.src) return;
+    if (window.SC && window.SC.Widget) {
+      scWidget = window.SC.Widget(iframe);
+      scWidget.bind(window.SC.Widget.Events.READY, () => {
+        scWidget.setVolume(scVolume);
+      });
+    }
+  }
+
+  // Init
+  document.getElementById('volSlider').style.setProperty('--val','70%');
+  document.getElementById('soundName').textContent = 'Toca para reproducir';
+  renderPlaylist();
+  renderSuggestions();
+
+  // Wake Lock
+  async function requestWakeLock() {
+    try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+  document.getElementById('mainOrb').addEventListener('click', requestWakeLock);
+
+  // Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+</script>
+</body>
+</html>
