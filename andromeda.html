@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Andromeda</title>
+
+<!-- React 18 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<!-- Babel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+
+<style>
+/* ── RESET ── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+
+/* ── TOKENS ── */
+:root{
+  --bg:       #05030F;
+  --s1:       #0A0718;
+  --s2:       #0F0B20;
+  --s3:       #181228;
+  --border:   rgba(180,120,255,0.08);
+  --border2:  rgba(180,120,255,0.15);
+  --text:     #EDE8FF;
+  --muted:    #9080BB;
+  --dim:      #4A3A6A;
+  --red:      #C855F5;
+  --orange:   #E040FF;
+  --blue:     #7B6CFE;
+  --green:    #00E5CC;
+  --font:     'Syne', sans-serif;
+  --mono:     'Space Mono', monospace;
+}
+
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* grain */
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* orbs */
+.orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:.14}
+.orb-red{width:520px;height:520px;background:#8B2BE2;top:-180px;left:-180px}
+.orb-blue{width:400px;height:400px;background:#4B3FCC;bottom:-120px;right:-120px}
+.orb-orange{width:300px;height:300px;background:#CC30FF;top:38%;left:52%;opacity:.13}
+
+/* ── GLASS ── */
+.glass{
+  background:rgba(255,255,255,0.03);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--border);
+  border-radius:14px;
+}
+.glass-strong{
+  background:rgba(255,255,255,0.05);
+  backdrop-filter:blur(32px);
+  -webkit-backdrop-filter:blur(32px);
+  border:1px solid var(--border2);
+  border-radius:18px;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--s3);border-radius:2px}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spinA{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px rgba(255,49,49,.12)}50%{box-shadow:0 0 40px rgba(255,49,49,.28)}}
+
+.anim-up{animation:fadeUp .45s cubic-bezier(.16,1,.3,1) both}
+.spin{animation:spinA .8s linear infinite}
+.pulse{animation:pulse 2s ease-in-out infinite}
+.delay1{animation-delay:.08s}
+.delay2{animation-delay:.16s}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;
+  background:rgba(5,3,15,.88);
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{font-size:20px;font-weight:800;letter-spacing:-.5px;user-select:none}
+.nav-logo span{color:var(--red)}
+.nav-logo small{margin-left:8px;font-size:9px;font-weight:400;color:var(--dim);letter-spacing:3px;text-transform:uppercase}
+.nav-tabs{display:flex;gap:4px;padding:4px;border-radius:12px;background:var(--s2);border:1px solid var(--border)}
+.nav-tab{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 16px;border-radius:9px;border:none;cursor:pointer;
+  font-family:var(--font);font-size:13px;font-weight:600;
+  background:transparent;color:var(--dim);transition:all .2s;
+}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{background:var(--s3);color:var(--text)}
+.tab-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.nav-badge{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--dim);
+  padding:6px 12px;border-radius:9px;
+  background:var(--s2);border:1px solid var(--border);
+}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+/* ── PAGE WRAPPER ── */
+.page{display:none;min-height:100vh;position:relative;z-index:1}
+.page.active{display:block;animation:fadeUp .4s cubic-bezier(.16,1,.3,1) both}
+.inner{max-width:680px;margin:0 auto;padding:104px 20px 80px}
+
+/* ── PAGE HEADER ── */
+.eyebrow{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  color:var(--dim);margin-bottom:14px;
+}
+.eyebrow-line{width:16px;height:1px;background:var(--red);display:block}
+.eyebrow-line.blue{background:var(--blue)}
+h1{font-size:clamp(42px,9vw,76px);font-weight:800;line-height:.95;letter-spacing:-2px;margin-bottom:16px}
+h1 .hl-red{color:var(--red)}
+h1 .hl-blue{color:var(--blue)}
+.subtitle{font-size:15px;color:var(--muted);line-height:1.65;max-width:440px;margin-bottom:32px}
+
+/* ── PILLS ── */
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 13px;border-radius:100px;
+  font-size:12px;font-weight:600;color:var(--dim);
+  background:var(--s2);border:1px solid var(--border);
+}
+
+/* ── INPUT ── */
+.input-wrap{position:relative;margin-bottom:10px}
+.url-input{
+  width:100%;background:var(--s2);border:1.5px solid var(--s3);border-radius:16px;
+  padding:18px 140px 18px 18px;
+  font-family:var(--mono);font-size:12px;color:var(--text);
+  transition:border-color .2s,box-shadow .2s;
+}
+.url-input::placeholder{color:var(--dim);font-family:var(--font)}
+.url-input:focus{outline:none;border-color:rgba(200,85,245,.5);box-shadow:0 0 0 3px rgba(200,85,245,.08)}
+.url-input.blue:focus{border-color:rgba(79,142,247,.5);box-shadow:0 0 0 3px rgba(79,142,247,.07)}
+.go-btn{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  background:var(--red);color:#fff;border:none;border-radius:10px;
+  padding:10px 20px;font-family:var(--font);font-size:13px;font-weight:700;
+  cursor:pointer;transition:background .15s,transform .1s,opacity .2s;white-space:nowrap;
+}
+.go-btn:hover{background:#e01f1f}
+.go-btn:active{transform:translateY(-50%) scale(.96)}
+.go-btn:disabled{background:var(--s3);color:var(--dim);cursor:not-allowed}
+.go-btn.blue{background:var(--blue)}
+.go-btn.blue:hover{background:#3a78e0}
+.hint{font-size:11px;color:var(--dim);padding-left:4px;margin-bottom:28px}
+
+/* ── SPINNER ── */
+.spinner-wrap{display:flex;justify-content:center;margin-bottom:18px}
+.spinner{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--s3);border-top-color:var(--red)}
+.spinner.blue{border-top-color:var(--blue)}
+
+/* ── LOADING BOX ── */
+.loading-box{padding:40px;text-align:center}
+.loading-steps{margin-top:4px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.v-step{font-size:11px;font-family:var(--mono);color:var(--s3);transition:color .3s}
+.v-step.on{color:var(--red)}
+.v-step.done{color:var(--dim);text-decoration:line-through}
+
+/* ── ERROR ── */
+.error-box{
+  padding:16px 20px;text-align:center;font-size:14px;color:#ff6060;margin-top:12px;
+  background:rgba(255,49,49,.07);border:1px solid rgba(255,49,49,.18);border-radius:14px;
+}
+
+/* ── RESULT CARD ── */
+.result-card{margin-top:28px;overflow:hidden}
+.result-top{
+  padding:18px 22px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:14px;
+  background:linear-gradient(135deg,rgba(255,49,49,.07),transparent);
+}
+.platform-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.platform-icon.yt{background:rgba(255,0,0,.12)}
+.platform-icon.tt{background:rgba(105,201,208,.12)}
+.r-title{font-size:14px;font-weight:700;line-height:1.3;margin-bottom:3px}
+.r-url{font-size:10px;color:var(--dim);font-family:var(--mono);word-break:break-all}
+.result-body{padding:24px 22px}
+
+.section-head{
+  display:flex;align-items:center;gap:8px;
+  font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  color:var(--dim);margin-bottom:12px;
+}
+.section-line{flex:1;height:1px;background:var(--s3)}
+
+.summary{font-size:14px;line-height:1.75;color:#ccc;margin-bottom:24px}
+
+.points{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.point{display:flex;gap:12px;font-size:13px;line-height:1.55;color:#aaa}
+.point-num{font-family:var(--mono);font-size:11px;color:var(--red);min-width:22px;padding-top:1px;flex-shrink:0}
+
+.verdict{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:14px 16px;border-radius:12px;
+  background:rgba(139,43,226,.07);border:1px solid rgba(139,43,226,.2);
+}
+.verdict-emoji{font-size:20px;line-height:1;flex-shrink:0}
+.verdict-text{font-size:13px;color:#bbb;line-height:1.6}
+.verdict-text strong{color:var(--orange);font-weight:700}
+
+/* ── HISTORY ── */
+.history{margin-top:36px}
+.history-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--s3);margin-bottom:12px}
+.history-list{display:flex;flex-direction:column;gap:6px}
+.history-item{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 15px;border-radius:12px;cursor:pointer;
+  background:var(--s1);border:1px solid var(--border);transition:border-color .2s;
+  text-align:left;width:100%;font-family:var(--font);
+}
+.history-item:hover{border-color:var(--s3)}
+.h-icon{font-size:14px;flex-shrink:0}
+.h-title{font-size:12px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-time{font-size:10px;color:var(--dim);font-family:var(--mono);flex-shrink:0}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone{
+  border:2px dashed var(--s3);border-radius:20px;
+  padding:56px 32px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;position:relative;
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:rgba(79,142,247,.04)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:46px;margin-bottom:14px;display:block}
+.upload-title{font-size:18px;font-weight:700;margin-bottom:6px}
+.upload-sub{font-size:13px;color:var(--muted);margin-bottom:18px}
+.fmt-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.fmt-chip{
+  font-size:10px;font-family:var(--mono);color:var(--dim);
+  padding:3px 9px;border-radius:6px;background:var(--s2);border:1px solid var(--border);
+}
+
+/* ── FILE PREVIEW ── */
+.file-preview{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 18px;border-radius:14px;margin-bottom:18px;
+}
+.file-type-icon{
+  width:46px;height:46px;border-radius:11px;display:flex;align-items:center;
+  justify-content:center;font-size:22px;flex-shrink:0;
+  background:rgba(79,142,247,.12);
+}
+.file-info{flex:1;min-width:0}
+.file-name{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-size{font-size:11px;color:var(--muted);margin-top:2px}
+.remove-btn{
+  width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--dim);cursor:pointer;background:var(--s2);border:1px solid var(--border);
+  transition:all .2s;flex-shrink:0;
+}
+.remove-btn:hover{color:var(--red);border-color:rgba(255,49,49,.25);background:rgba(255,49,49,.08)}
+
+/* ── FORMAT GRID ── */
+.fmt-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.fmt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.fmt-option{
+  background:var(--s1);border:1.5px solid var(--border);border-radius:14px;
+  padding:18px 14px;text-align:center;cursor:pointer;transition:all .2s;
+}
+.fmt-option:hover{border-color:var(--s3);transform:translateY(-2px)}
+.fmt-option.sel{border-color:rgba(79,142,247,.55);background:rgba(79,142,247,.07)}
+.fmt-option .fo-icon{font-size:26px;margin-bottom:8px}
+.fmt-option .fo-name{font-size:12px;font-weight:700}
+.fmt-option .fo-desc{font-size:10px;color:var(--dim);margin-top:2px}
+
+/* ── CONVERT BTN ── */
+.convert-btn{
+  width:100%;padding:16px;border-radius:14px;border:none;cursor:pointer;
+  font-family:var(--font);font-size:14px;font-weight:700;letter-spacing:.3px;
+  background:var(--blue);color:#fff;transition:background .15s,transform .1s,opacity .2s;
+}
+.convert-btn:hover{background:#3a78e0}
+.convert-btn:active{transform:scale(.98)}
+.convert-btn:disabled{background:var(--s3);color:var(--dim);cursor:not-allowed}
+
+/* ── RESULT DOWNLOAD ── */
+.dl-card{
+  padding:36px 24px;text-align:center;
+  background:rgba(0,229,204,.04);border:1px solid rgba(0,229,204,.18);border-radius:18px;
+}
+.dl-check{font-size:46px;margin-bottom:10px}
+.dl-title{font-size:22px;font-weight:800;color:#00E5CC;margin-bottom:4px}
+.dl-sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+.dl-btn{background:linear-gradient(135deg,#7B6CFE,#C855F5);
+  display:inline-flex;align-items:center;gap:8px;
+  color:#fff;font-family:var(--font);
+  font-size:14px;font-weight:700;padding:13px 28px;border-radius:12px;
+  text-decoration:none;transition:background .15s,transform .1s;cursor:pointer;border:none;
+}
+.dl-btn:hover{opacity:.88}
+.dl-btn:active{transform:scale(.97)}
+.again-btn{
+  display:block;margin:14px auto 0;font-size:12px;color:var(--dim);
+  cursor:pointer;background:none;border:none;font-family:var(--font);
+  text-decoration:underline;text-underline-offset:3px;transition:color .2s;
+}
+.again-btn:hover{color:var(--text)}
+
+/* ── FOOTER ── */
+footer{text-align:center;padding:40px 20px 30px;font-size:11px;color:var(--s3);font-family:var(--mono)}
+
+/* ── TOOLKIT PAGE ── */
+.tk-search-wrap{position:relative;margin-bottom:24px}
+.tk-search{
+  width:100%;background:var(--s2);border:1.5px solid var(--s3);border-radius:14px;
+  padding:14px 18px 14px 44px;font-family:var(--font);font-size:14px;color:var(--text);
+  transition:border-color .2s,box-shadow .2s;
+}
+.tk-search::placeholder{color:var(--dim)}
+.tk-search:focus{outline:none;border-color:rgba(200,85,245,.5);box-shadow:0 0 0 3px rgba(200,85,245,.08)}
+.tk-search-icon{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none}
+.tk-stats{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+.tk-stat{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:8px;background:var(--s2);border:1px solid var(--border);font-size:11px;color:var(--dim)}
+.tk-stat .sd{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.category{margin-bottom:8px;border-radius:16px;overflow:hidden;background:var(--s1);border:1px solid var(--border)}
+.cat-header{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;cursor:pointer;transition:background .15s;user-select:none}
+.cat-header:hover{background:var(--s2)}
+.cat-left{display:flex;align-items:center;gap:11px}
+.cat-icon{font-size:20px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:9px;flex-shrink:0}
+.cat-name{font-size:14px;font-weight:700}
+.cat-count{font-size:10px;color:var(--dim);margin-top:1px}
+.cat-arrow{font-size:11px;color:var(--dim);transition:transform .25s;flex-shrink:0}
+.cat-arrow.open{transform:rotate(180deg)}
+.cat-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:7px;max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.16,1,.3,1),padding .3s}
+.cat-body.open{max-height:800px;padding:0 12px 12px}
+.app-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:13px 8px;border-radius:11px;text-decoration:none;background:var(--s2);border:1px solid var(--border);transition:all .18s;text-align:center}
+.app-card:hover{border-color:var(--border2);transform:translateY(-2px);background:var(--s3);text-decoration:none}
+.app-icon{font-size:26px;line-height:1}
+.app-name{font-size:12px;font-weight:700;color:var(--text)}
+.app-tag{font-size:9px;color:var(--dim);font-family:var(--mono);margin-top:1px}
+.app-tag.free{color:var(--green)}
+.app-tag.paid{color:var(--orange)}
+.no-results{text-align:center;padding:48px;color:var(--dim);font-size:14px}
+@media(max-width:480px){.cat-body{grid-template-columns:1fr 1fr}}
+
+/* ── MOBILE ── */
+@media(max-width:480px){
+  .nav-badge{display:none}
+  nav{padding:12px 16px}
+  .nav-tab{padding:7px 12px;font-size:12px}
+  .inner{padding:90px 16px 60px}
+  h1{font-size:42px;letter-spacing:-1.5px}
+  .url-input{padding:16px 130px 16px 16px;font-size:11px}
+  .go-btn{padding:9px 14px;font-size:12px}
+  .fmt-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Orbs -->
+<div class="orb orb-red"></div>
+<div class="orb orb-blue"></div>
+<div class="orb orb-orange"></div>
+<div class="orb" style="width:180px;height:180px;background:#00E5CC;top:18%;right:8%;filter:blur(80px);opacity:.08"></div>
+<canvas id="stars" style="position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.55"></canvas>
+
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef } = React;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ⬇️ Reemplaza con la URL de tu Cloudflare Worker (ver worker.js)
+const WORKER_URL = "https://soft-cell-b958.krocmc2013.workers.dev";
+
+/* ── NAV ── */
+function Nav({ tab, setTab }) {
+  return (
+    <nav>
+      <div className="nav-logo">
+        Andro<span>meda</span>
+        
+      </div>
+
+      <div className="nav-tabs">
+        {[
+          { id:'video', label:'Resumir Video', color:'#FF3131' },
+          { id:'doc',   label:'Convertir Docs', color:'#7B6CFE' },
+          { id:'toolkit', label:'Post-Format Kit', color:'#E040FF' },
+        ].map(t => (
+          <button key={t.id} className={`nav-tab ${tab===t.id?'active':''}`} onClick={() => setTab(t.id)}>
+            <span className="tab-dot" style={{ background: t.color, opacity: tab===t.id ? 1 : 0.3 }} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="nav-badge">
+        <span className="live-dot pulse" />
+        Claude AI
+      </div>
+    </nav>
+  );
+}
+
+/* ── SPINNER ── */
+function Spinner({ blue }) {
+  return (
+    <div className="spinner-wrap">
+      <div className={`spinner spin ${blue?'blue':''}`} />
+    </div>
+  );
+}
+
+/* ════════════════════
+   VIDEO PAGE
+════════════════════ */
+function VideoPage() {
+  const [url, setUrl]       = useState('');
+  const [loading, setLoad]  = useState(false);
+  const [step, setStep]     = useState(0);
+  const [result, setResult] = useState(null);
+  const [error, setError]   = useState('');
+  const [hist, setHist]     = useState([]);
+
+  const STEPS = ['Identificando plataforma...','Buscando info del video...','Generando resumen con IA...'];
+
+  function platform(u) {
+    if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+    if (u.includes('tiktok.com')) return 'tiktok';
+    return null;
+  }
+
+  async function go() {
+    if (!url.trim()) { setError('Pega un link primero 👀'); return; }
+    const p = platform(url);
+    if (!p) { setError('Solo YouTube y TikTok por ahora 🙏'); return; }
+    setError(''); setResult(null); setLoad(true); setStep(0);
+    await sleep(500); setStep(1);
+    await sleep(400); setStep(2);
+
+    const prompt = `Eres asistente que resume videos de ${p==='youtube'?'YouTube':'TikTok'}. URL: ${url}
+
+Busca info pública y responde SOLO con JSON sin markdown:
+{"titulo":"título","resumen":"resumen 2-4 oraciones español casual","puntos":["p1","p2","p3","p4"],"veredicto":"veredicto honesto una oración","vale":true}`;
+
+    try {
+      const r = await fetch(WORKER_URL, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-20250514', max_tokens:1000,
+          tools:[{type:'web_search_20250305', name:'web_search'}],
+          messages:[{role:'user', content:prompt}]
+        })
+      });
+      const d = await r.json();
+      const txt = d.content.map(b => b.type==='text'?b.text:'').join('');
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('Sin respuesta JSON');
+      const parsed = JSON.parse(m[0]);
+      setResult({...parsed, platform:p, url});
+      setHist(h => [{...parsed, platform:p, url, time:new Date()}, ...h].slice(0,4));
+    } catch(e) { setError('Error: '+(e.message||'Intenta de nuevo')); }
+    setLoad(false);
+  }
+
+  return (
+    <div className="page active" id="page-video">
+      <div className="inner">
+        {/* Header */}
+        <div className="anim-up">
+          <p className="eyebrow"><span className="eyebrow-line" />IA · Web Search · Tiempo ahorrado</p>
+          <h1>El resumen<br/><span className="hl-red">que necesitas</span></h1>
+          <p className="subtitle">Pega el link, nosotros vemos el video por ti. Puntos clave, resumen y veredicto honesto. ☠️</p>
+        </div>
+
+        <div className="pills anim-up delay1">
+          {[['▶️','YouTube'],['🎵','TikTok'],['🤖','Claude AI']].map(([ic,lb]) => (
+            <span key={lb} className="pill">{ic} {lb}</span>
+          ))}
+        </div>
+
+        {/* Input */}
+        <div className="anim-up delay2">
+          <div className="input-wrap">
+            <input
+              className="url-input"
+              placeholder="https://youtube.com/watch?v=... o tiktok.com/@..."
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              onKeyDown={e => e.key==='Enter' && go()}
+              spellCheck={false}
+            />
+            <button className="go-btn" disabled={loading} onClick={go}>
+              {loading ? '...' : 'Resumir →'}
+            </button>
+          </div>
+          <p className="hint">Presiona Enter o clic · Funciona mejor con YouTube</p>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="glass loading-box anim-up">
+            <Spinner />
+            <div className="loading-steps">
+              {STEPS.map((s,i) => (
+                <p key={i} className={`v-step ${i<step?'done':i===step?'on':''}`}>
+                  {i<=step?'›':'·'} {s}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && <div className="error-box anim-up">{error}</div>}
+
+        {/* Result */}
+        {result && !loading && (
+          <div className="glass-strong result-card anim-up">
+            <div className="result-top">
+              <div className={`platform-icon ${result.platform==='youtube'?'yt':'tt'}`}>
+                {result.platform==='youtube'?'▶️':'🎵'}
+              </div>
+              <div style={{minWidth:0}}>
+                <p className="r-title">{result.titulo}</p>
+                <p className="r-url">{result.url}</p>
+              </div>
+            </div>
+
+            <div className="result-body">
+              <div className="section-head">TL;DR<span className="section-line"/></div>
+              <p className="summary">{result.resumen}</p>
+
+              <div className="section-head">Puntos clave<span className="section-line"/></div>
+              <ul className="points">
+                {(result.puntos||[]).map((p,i) => (
+                  <li key={i} className="point">
+                    <span className="point-num">{String(i+1).padStart(2,'0')}</span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="verdict">
+                <span className="verdict-emoji">{result.vale?'✅':'❌'}</span>
+                <p className="verdict-text">
+                  <strong>{result.vale?'Sí vale la pena':'Mejor skip'}</strong>
+                  {' — '}{result.veredicto}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* History */}
+        {hist.length > 0 && (
+          <div className="history anim-up">
+            <p className="history-label">Historial de sesión</p>
+            <div className="history-list">
+              {hist.map((h,i) => (
+                <button key={i} className="history-item" onClick={() => { setUrl(h.url); setResult(null); }}>
+                  <span className="h-icon">{h.platform==='youtube'?'▶️':'🎵'}</span>
+                  <span className="h-title">{h.titulo}</span>
+                  <span className="h-time">{h.time.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════
+   DOC PAGE
+════════════════════ */
+const FMT = {
+  pdf: {icon:'📕',ext:'pdf', desc:'Documento PDF'},
+  docx:{icon:'📝',ext:'docx',desc:'Microsoft Word'},
+  txt: {icon:'📃',ext:'txt', desc:'Texto plano'},
+  html:{icon:'🌐',ext:'html',desc:'Página web'},
+  md:  {icon:'✏️',ext:'md',  desc:'Markdown'},
+};
+const CONV = {
+  docx:['pdf','txt','html','md'], doc:['pdf','docx','txt'],
+  pdf:['txt','html'], txt:['pdf','docx','html','md'],
+  rtf:['pdf','docx','txt'], odt:['pdf','docx','txt'],
+  pptx:['pdf','txt'], xlsx:['pdf','txt'],
+};
+const FICONS={docx:'📝',doc:'📝',pdf:'📕',txt:'📃',rtf:'📋',odt:'📋',pptx:'📊',xlsx:'📈'};
+const fmtB = n => n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';
+
+function DocPage() {
+  const [file, setFile]   = useState(null);
+  const [fmt, setFmt]     = useState(null);
+  const [loading, setLoad]= useState(false);
+  const [msg, setMsg]     = useState('');
+  const [result, setRes]  = useState(null);
+  const [error, setError] = useState('');
+  const [drag, setDrag]   = useState(false);
+  const inputRef = useRef(null);
+
+  const ext = f => f?.name.split('.').pop().toLowerCase();
+  const targets = file ? (CONV[ext(file)]||[]) : [];
+
+  function pick(f) { if(!f)return; setFile(f); setFmt(null); setRes(null); setError(''); }
+  function clear() { setFile(null);setFmt(null);setRes(null);setError(''); if(inputRef.current)inputRef.current.value=''; }
+
+  async function readText(f) {
+    const e = ext(f);
+    if (e==='docx'||e==='doc') {
+      return new Promise(resolve => {
+        const r = new FileReader();
+        r.onload = ev => {
+          const dec = new TextDecoder('utf-8',{fatal:false});
+          const raw = dec.decode(ev.target.result);
+          const clean = raw.replace(/<[^>]*>/g,' ').replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g,' ').replace(/\s+/g,' ').trim();
+          resolve(clean.length>50?clean:'Contenido del documento Word.');
+        };
+        r.readAsArrayBuffer(f);
+      });
+    }
+    return new Promise((res,rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = ()=>rej(new Error('No se pudo leer'));
+      r.readAsText(f,'UTF-8');
+    });
+  }
+
+  async function convert() {
+    if(!file||!fmt)return;
+    setLoad(true); setRes(null); setError('');
+    setMsg('Leyendo el archivo...'); await sleep(500);
+    setMsg('Procesando contenido...'); await sleep(400);
+    setMsg(`Convirtiendo a .${fmt.toUpperCase()}...`);
+    try {
+      const content = await readText(file);
+      const e = ext(file);
+      const prompt = `Convierte este contenido de .${e} a .${fmt}.
+Contenido (primeros 4000 chars):
+${content.slice(0,4000)}
+Reglas: html→HTML5 completo con estilos; md→Markdown correcto; txt→texto limpio; pdf→HTML para imprimir.
+Responde SOLO con el contenido convertido, sin backticks ni explicaciones.`;
+      const r = await fetch(WORKER_URL,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,
+          messages:[{role:'user',content:prompt}]})
+      });
+      const d = await r.json();
+      const out = d.content.map(b=>b.type==='text'?b.text:'').join('');
+      if(!out||out.length<10)throw new Error('La IA no pudo convertir el archivo');
+      const mimes={html:'text/html',txt:'text/plain',md:'text/markdown',pdf:'text/html'};
+      const blob = new Blob([out],{type:(mimes[fmt]||'text/plain')+';charset=utf-8'});
+      const blobUrl = URL.createObjectURL(blob);
+      const base = file.name.replace(/\.[^.]+$/,'');
+      setRes({blobUrl, name:base+'.'+fmt});
+    } catch(e) { setError('Error: '+(e.message||'Intenta de nuevo')); }
+    setLoad(false);
+  }
+
+  return (
+    <div className="page active" id="page-doc">
+      <div className="inner">
+        {/* Header */}
+        <div className="anim-up">
+          <p className="eyebrow"><span className="eyebrow-line blue"/>Conversión · Sin instalar nada · Gratis</p>
+          <h1>Convierte<br/><span className="hl-blue">tus docs</span></h1>
+          <p className="subtitle">Sube tu Word, PDF o texto y descárgalo en el formato que necesites. Todo en el navegador.</p>
+        </div>
+
+        {/* Upload zone */}
+        {!file && (
+          <div
+            className={`upload-zone anim-up delay1 ${drag?'drag':''}`}
+            onDragOver={e=>{e.preventDefault();setDrag(true)}}
+            onDragLeave={()=>setDrag(false)}
+            onDrop={e=>{e.preventDefault();setDrag(false);pick(e.dataTransfer.files[0])}}
+            onClick={()=>inputRef.current?.click()}>
+            <input ref={inputRef} type="file"
+              accept=".docx,.doc,.pdf,.txt,.rtf,.odt,.pptx,.xlsx"
+              onChange={e=>pick(e.target.files[0])} />
+            <span className="upload-icon">📂</span>
+            <p className="upload-title">Arrastra tu archivo aquí</p>
+            <p className="upload-sub">o haz clic para seleccionarlo</p>
+            <div className="fmt-chips">
+              {['.docx','.doc','.pdf','.txt','.rtf','.pptx','.xlsx'].map(f=>(
+                <span key={f} className="fmt-chip">{f}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* File preview */}
+        {file && (
+          <div className="glass-strong file-preview anim-up">
+            <div className="file-type-icon">{FICONS[ext(file)]||'📄'}</div>
+            <div className="file-info">
+              <p className="file-name">{file.name}</p>
+              <p className="file-size">{fmtB(file.size)} · .{ext(file).toUpperCase()}</p>
+            </div>
+            <button className="remove-btn" onClick={clear}>✕</button>
+          </div>
+        )}
+
+        {/* Format picker */}
+        {file && targets.length>0 && !result && !loading && (
+          <div className="anim-up">
+            <p className="fmt-label">Convertir a →</p>
+            <div className="fmt-grid">
+              {targets.map(f => {
+                const info=FMT[f]; if(!info)return null;
+                return (
+                  <button key={f} className={`fmt-option ${fmt===f?'sel':''}`} onClick={()=>setFmt(f)}>
+                    <div className="fo-icon">{info.icon}</div>
+                    <p className="fo-name">.{info.ext.toUpperCase()}</p>
+                    <p className="fo-desc">{info.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <button className="convert-btn" disabled={!fmt} onClick={convert}>
+              {fmt?`Convertir a .${fmt.toUpperCase()} →`:'Selecciona un formato primero'}
+            </button>
+          </div>
+        )}
+
+        {/* No support */}
+        {file && targets.length===0 && (
+          <div className="error-box anim-up" style={{color:'#FFD60A',background:'rgba(255,214,10,.06)',borderColor:'rgba(255,214,10,.18)'}}>
+            Formato no soportado. Prueba con .docx, .pdf o .txt
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div className="glass loading-box anim-up" style={{marginTop:16}}>
+            <Spinner blue />
+            <p style={{fontSize:13,color:'var(--muted)',marginTop:4}} className="pulse">{msg}</p>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && <div className="error-box anim-up" style={{marginTop:12}}>{error}</div>}
+
+        {/* Result */}
+        {result && !loading && (
+          <div className="dl-card anim-up" style={{marginTop:16}}>
+            <div className="dl-check">✅</div>
+            <p className="dl-title">¡Listo!</p>
+            <p className="dl-sub">"{result.name}" convertido correctamente.</p>
+            <a className="dl-btn" href={result.blobUrl} download={result.name}>
+              ⬇️ Descargar archivo
+            </a>
+            <button className="again-btn" onClick={clear}>Convertir otro archivo</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════
+   TOOLKIT PAGE
+════════════════════ */
+const CATEGORIES = [
+  {
+    id:'browsers', name:'Navegadores', icon:'🌐', color:'rgba(79,142,247,.15)',
+    apps:[
+      {name:'Chrome',     icon:'🔵', url:'https://www.google.com/chrome/',                tag:'free'},
+      {name:'Firefox',    icon:'🦊', url:'https://www.mozilla.org/firefox/',              tag:'free'},
+      {name:'Brave',      icon:'🦁', url:'https://brave.com/',                            tag:'free'},
+      {name:'Edge',       icon:'🌊', url:'https://www.microsoft.com/edge',                tag:'free'},
+      {name:'Opera GX',   icon:'🎮', url:'https://www.opera.com/gx',                     tag:'free'},
+      {name:'Vivaldi',    icon:'🎵', url:'https://vivaldi.com/',                          tag:'free'},
+    ]
+  },
+  {
+    id:'mail', name:'Correo', icon:'📧', color:'rgba(0,217,126,.12)',
+    apps:[
+      {name:'Thunderbird', icon:'🐦', url:'https://www.thunderbird.net/',                 tag:'free'},
+      {name:'Outlook',     icon:'📘', url:'https://www.microsoft.com/microsoft-365',      tag:'paid'},
+      {name:'Gmail',       icon:'📨', url:'https://mail.google.com/',                     tag:'free'},
+      {name:'Mailspring',  icon:'💌', url:'https://getmailspring.com/',                   tag:'free'},
+    ]
+  },
+  {
+    id:'office', name:'Oficina', icon:'📄', color:'rgba(255,49,49,.12)',
+    apps:[
+      {name:'LibreOffice',    icon:'📝', url:'https://www.libreoffice.org/',              tag:'free'},
+      {name:'Microsoft 365',  icon:'🏢', url:'https://www.microsoft.com/microsoft-365',  tag:'paid'},
+      {name:'WPS Office',     icon:'📋', url:'https://www.wps.com/',                     tag:'free'},
+      {name:'Google Docs',    icon:'📃', url:'https://docs.google.com/',                 tag:'free'},
+      {name:'OnlyOffice',     icon:'🗂️', url:'https://www.onlyoffice.com/',              tag:'free'},
+      {name:'FreeOffice',     icon:'📑', url:'https://www.freeoffice.com/',               tag:'free'},
+    ]
+  },
+  {
+    id:'design', name:'Diseño', icon:'🎨', color:'rgba(255,140,0,.12)',
+    apps:[
+      {name:'Figma',       icon:'🎯', url:'https://www.figma.com/',                       tag:'free'},
+      {name:'GIMP',        icon:'🖼️', url:'https://www.gimp.org/',                       tag:'free'},
+      {name:'Inkscape',    icon:'✏️', url:'https://inkscape.org/',                        tag:'free'},
+      {name:'Canva',       icon:'🎪', url:'https://www.canva.com/',                       tag:'free'},
+      {name:'Krita',       icon:'🖌️', url:'https://krita.org/',                          tag:'free'},
+      {name:'Photoshop',   icon:'🌅', url:'https://www.adobe.com/photoshop',              tag:'paid'},
+      {name:'Illustrator', icon:'🦋', url:'https://www.adobe.com/illustrator',            tag:'paid'},
+      {name:'Blender',     icon:'🧊', url:'https://www.blender.org/',                    tag:'free'},
+    ]
+  },
+  {
+    id:'dev', name:'Desarrollo', icon:'💻', color:'rgba(79,142,247,.12)',
+    apps:[
+      {name:'VS Code',      icon:'🔷', url:'https://code.visualstudio.com/',             tag:'free'},
+      {name:'Git',          icon:'🌿', url:'https://git-scm.com/',                       tag:'free'},
+      {name:'Node.js',      icon:'🟢', url:'https://nodejs.org/',                        tag:'free'},
+      {name:'Python',       icon:'🐍', url:'https://www.python.org/',                    tag:'free'},
+      {name:'Postman',      icon:'📮', url:'https://www.postman.com/',                   tag:'free'},
+      {name:'Docker',       icon:'🐳', url:'https://www.docker.com/',                    tag:'free'},
+      {name:'Git Desktop',icon:'🐙',url:'https://desktop.github.com/',               tag:'free'},
+      {name:'Windows Terminal',icon:'⬛',url:'https://apps.microsoft.com/store/detail/windows-terminal/9N0DX20HK701',tag:'free'},
+    ]
+  },
+  {
+    id:'media', name:'Multimedia', icon:'🎬', color:'rgba(255,49,49,.1)',
+    apps:[
+      {name:'VLC',         icon:'🔺', url:'https://www.videolan.org/vlc/',               tag:'free'},
+      {name:'Spotify',     icon:'🎵', url:'https://www.spotify.com/',                    tag:'free'},
+      {name:'OBS Studio',  icon:'📹', url:'https://obsproject.com/',                     tag:'free'},
+      {name:'Handbrake',   icon:'🎞️', url:'https://handbrake.fr/',                      tag:'free'},
+      {name:'DaVinci',     icon:'🎬', url:'https://www.blackmagicdesign.com/products/davinciresolve', tag:'free'},
+      {name:'Audacity',    icon:'🎙️', url:'https://www.audacityteam.org/',              tag:'free'},
+    ]
+  },
+  {
+    id:'utils', name:'Utilidades', icon:'🛠️', color:'rgba(255,214,10,.1)',
+    apps:[
+      {name:'7-Zip',         icon:'🗜️', url:'https://www.7-zip.org/',                   tag:'free'},
+      {name:'WinRAR',        icon:'📦', url:'https://www.win-rar.com/',                  tag:'paid'},
+      {name:'CCleaner',      icon:'🧹', url:'https://www.ccleaner.com/',                 tag:'free'},
+      {name:'TreeSize Free', icon:'📊', url:'https://www.jam-software.com/treesize_free',tag:'free'},
+      {name:'CPU-Z',         icon:'🔬', url:'https://www.cpuid.com/softwares/cpu-z.html',tag:'free'},
+      {name:'HWMonitor',     icon:'🌡️', url:'https://www.cpuid.com/softwares/hwmonitor.html',tag:'free'},
+      {name:'CrystalDisk',   icon:'💎', url:'https://crystalmark.info/en/software/crystaldiskinfo/',tag:'free'},
+      {name:'Rufus',         icon:'💿', url:'https://rufus.ie/',                         tag:'free'},
+    ]
+  },
+  {
+    id:'drivers', name:'Drivers & Sistema', icon:'⚙️', color:'rgba(0,217,126,.1)',
+    apps:[
+      {name:'DirectX',      icon:'🎮', url:'https://www.microsoft.com/download/details.aspx?id=35',tag:'free'},
+      {name:'Visual C++',   icon:'🔧', url:'https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist',tag:'free'},
+      {name:'.NET Framework',icon:'🔩',url:'https://dotnet.microsoft.com/download',      tag:'free'},
+      {name:'NVIDIA Drivers',icon:'🟩',url:'https://www.nvidia.com/Download/index.aspx', tag:'free'},
+      {name:'AMD Drivers',   icon:'🔴',url:'https://www.amd.com/support',                tag:'free'},
+      {name:'Intel Drivers', icon:'🔵',url:'https://www.intel.com/content/www/us/en/download-center/home.html',tag:'free'},
+    ]
+  },
+  {
+    id:'security', name:'Seguridad', icon:'🔐', color:'rgba(255,49,49,.1)',
+    apps:[
+      {name:'Malwarebytes', icon:'🛡️', url:'https://www.malwarebytes.com/',              tag:'free'},
+      {name:'Windows Defender',icon:'🪟',url:'https://www.microsoft.com/windows/comprehensive-security',tag:'free'},
+      {name:'Bitwarden',    icon:'🔑', url:'https://bitwarden.com/',                     tag:'free'},
+      {name:'KeePass',      icon:'🗝️', url:'https://keepass.info/',                     tag:'free'},
+      {name:'Avast',        icon:'🟠', url:'https://www.avast.com/',                     tag:'free'},
+      {name:'ProtonVPN',    icon:'💜', url:'https://protonvpn.com/',                     tag:'free'},
+    ]
+  },
+  {
+    id:'comm', name:'Comunicación', icon:'💬', color:'rgba(79,142,247,.1)',
+    apps:[
+      {name:'Discord',  icon:'🎮', url:'https://discord.com/',                           tag:'free'},
+      {name:'Telegram', icon:'✈️', url:'https://desktop.telegram.org/',                 tag:'free'},
+      {name:'WhatsApp', icon:'💚', url:'https://www.whatsapp.com/download',              tag:'free'},
+      {name:'Slack',    icon:'💼', url:'https://slack.com/',                             tag:'free'},
+      {name:'Zoom',     icon:'📹', url:'https://zoom.us/download',                       tag:'free'},
+      {name:'Teams',    icon:'🟣', url:'https://www.microsoft.com/teams',                tag:'free'},
+      {name:'Signal',   icon:'🔒', url:'https://signal.org/',                            tag:'free'},
+    ]
+  },
+  {
+    id:'cloud', name:'Almacenamiento', icon:'☁️', color:'rgba(79,142,247,.1)',
+    apps:[
+      {name:'Google Drive', icon:'🔵', url:'https://drive.google.com/',                  tag:'free'},
+      {name:'OneDrive',     icon:'☁️', url:'https://www.microsoft.com/microsoft-365/onedrive/online-cloud-storage',tag:'free'},
+      {name:'Dropbox',      icon:'📦', url:'https://www.dropbox.com/',                   tag:'free'},
+      {name:'MEGA',         icon:'🟠', url:'https://mega.io/',                           tag:'free'},
+      {name:'pCloud',       icon:'🌤️', url:'https://www.pcloud.com/',                   tag:'free'},
+    ]
+  },
+  {
+    id:'gaming', name:'Gaming', icon:'🎮', color:'rgba(255,49,49,.1)',
+    apps:[
+      {name:'Steam',       icon:'🕹️', url:'https://store.steampowered.com/about/',      tag:'free'},
+      {name:'Epic Games',  icon:'⚡', url:'https://store.epicgames.com/',                tag:'free'},
+      {name:'GOG Galaxy',  icon:'🌌', url:'https://www.gog.com/galaxy',                  tag:'free'},
+      {name:'Battle.net',  icon:'🔵', url:'https://www.blizzard.com/download/',          tag:'free'},
+      {name:'GeForce Exp.',icon:'🟢', url:'https://www.nvidia.com/geforce-experience',   tag:'free'},
+      {name:'MSI Afterburner',icon:'🔥',url:'https://www.msi.com/Landing/afterburner',   tag:'free'},
+    ]
+  },
+];
+
+function ToolkitPage() {
+  const [open, setOpen] = React.useState({});
+  const [search, setSearch] = React.useState('');
+
+  const toggle = id => setOpen(o => ({...o, [id]: !o[id]}));
+
+  const filtered = search.trim() === '' ? CATEGORIES : CATEGORIES.map(cat => ({
+    ...cat,
+    apps: cat.apps.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+  })).filter(cat => cat.apps.length > 0);
+
+  const totalApps = CATEGORIES.reduce((s,c) => s + c.apps.length, 0);
+  const freeApps  = CATEGORIES.reduce((s,c) => s + c.apps.filter(a=>a.tag==='free').length, 0);
+
+  React.useEffect(() => {
+    if (search.trim()) setOpen(Object.fromEntries(filtered.map(c => [c.id, true])));
+  }, [search]);
+
+  return (
+    <div className="page active">
+      <div className="inner">
+        <div className="anim-up">
+          <p className="eyebrow"><span className="eyebrow-line" style={{background:'#E040FF'}}/>Post-Format · {CATEGORIES.length} categorías · {totalApps} apps</p>
+          <h1>Tu kit de<br/><span style={{color:'var(--orange)'}}>formato</span></h1>
+          <p className="subtitle">Todo lo que necesitas instalar después de formatear tu PC. Un clic y al sitio oficial. ☠️</p>
+        </div>
+
+        <div className="tk-stats anim-up">
+          <div className="tk-stat"><span className="sd" style={{background:'#00E5CC'}}/>Gratis: {freeApps}</div>
+          <div className="tk-stat"><span className="sd" style={{background:'#E040FF'}}/>De paga: {totalApps-freeApps}</div>
+          <div className="tk-stat"><span className="sd" style={{background:'var(--blue)'}}/>Categorías: {CATEGORIES.length}</div>
+        </div>
+
+        <div className="tk-search-wrap anim-up">
+          <span className="tk-search-icon">🔍</span>
+          <input className="tk-search" placeholder="Buscar programa..."
+            value={search} onChange={e=>setSearch(e.target.value)}/>
+        </div>
+
+        {filtered.length === 0 && (
+          <div className="no-results">No encontré "{search}" 😅</div>
+        )}
+
+        {filtered.map(cat => (
+          <div key={cat.id} className="category anim-up">
+            <div className="cat-header" onClick={()=>toggle(cat.id)}>
+              <div className="cat-left">
+                <div className="cat-icon" style={{background:cat.color}}>{cat.icon}</div>
+                <div>
+                  <p className="cat-name">{cat.name}</p>
+                  <p className="cat-count">{cat.apps.length} programas</p>
+                </div>
+              </div>
+              <span className={'cat-arrow '+(open[cat.id]?'open':'')}>▼</span>
+            </div>
+            <div className={'cat-body '+(open[cat.id]?'open':'')}>
+              {cat.apps.map(app => (
+                <a key={app.name} className="app-card" href={app.url} target="_blank" rel="noopener noreferrer">
+                  <span className="app-icon">{app.icon}</span>
+                  <span className="app-name">{app.name}</span>
+                  <span className={'app-tag '+(app.tag==='free'?'free':'paid')}>{app.tag==='free'?'✓ Gratis':'💳 De paga'}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════
+   APP ROOT
+════════════════════ */
+function App() {
+  const [tab, setTab] = useState('video');
+  return (
+    <>
+      <Nav tab={tab} setTab={setTab} />
+      {tab==='video' ? <VideoPage key="v"/> : tab==='doc' ? <DocPage key="d"/> : <ToolkitPage key="t"/>}
+      <footer>Andromeda · Tu hub personal ☠️ ☠️</footer>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+<script>
+(function(){
+  var c=document.getElementById('stars');
+  if(!c)return;
+  var ctx=c.getContext('2d');
+  function resize(){c.width=window.innerWidth;c.height=window.innerHeight;draw();}
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);
+    var colors=['rgba(220,180,255,','rgba(180,160,255,','rgba(160,220,255,','rgba(255,200,255,'];
+    for(var i=0;i<250;i++){
+      var x=Math.random()*c.width,y=Math.random()*c.height;
+      var r=Math.random()*1.1+0.15;
+      var a=Math.random()*0.65+0.1;
+      var col=colors[Math.floor(Math.random()*colors.length)];
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fillStyle=col+a+')';ctx.fill();
+    }
+  }
+  window.addEventListener('resize',resize);resize();
+})();
+</script>
+</body>
+</html>
