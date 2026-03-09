@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<title>SOS - Ayuda</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyDYW7ctUa1jstwA6tIQn-uo24s6T4_v8dk",
+    authDomain: "netgrid-21599.firebaseapp.com",
+    databaseURL: "https://netgrid-21599-default-rtdb.firebaseio.com",
+    projectId: "netgrid-21599",
+    storageBucket: "netgrid-21599.firebasestorage.app",
+    messagingSenderId: "1009376718946",
+    appId: "1:1009376718946:web:afb55715f7b5295645213b"
+  };
+  try{ firebase.initializeApp(firebaseConfig); window.db = firebase.database(); }catch(e){ window.db=null; }
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --red:#ff2222;
+  --red2:#ff6b6b;
+  --green:#22ff88;
+  --bg:#0a0a0a;
+  --card:#141414;
+  --text:#ffffff;
+  --muted:#666;
+}
+body{background:var(--bg);font-family:'Nunito',sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* ─── SETUP SCREEN ─── */
+#setup{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px 20px;gap:20px;}
+.setup-logo{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:6px;color:var(--red);text-shadow:0 0 30px #ff222260;}
+.setup-sub{font-size:14px;color:var(--muted);letter-spacing:3px;margin-top:-12px;}
+.setup-card{background:var(--card);border:1px solid #222;border-radius:20px;padding:24px;width:100%;max-width:420px;}
+.setup-card h3{font-size:13px;letter-spacing:3px;color:var(--muted);margin-bottom:16px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;}
+.field input,.field select{width:100%;background:#1a1a1a;border:1px solid #333;border-radius:10px;color:#fff;font-family:'Nunito',sans-serif;font-size:15px;padding:12px 14px;outline:none;transition:border .2s;}
+.field input:focus,.field select:focus{border-color:var(--red);}
+.field select option{background:#1a1a1a;}
+.contact-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px 12px;}
+.contact-row span{flex:1;font-size:13px;}
+.contact-row .role{font-size:10px;color:var(--muted);}
+.contact-row button{background:transparent;border:none;color:#444;cursor:pointer;font-size:16px;padding:2px 6px;}
+.contact-row button:hover{color:var(--red);}
+.btn-add{width:100%;padding:10px;background:transparent;border:1.5px dashed #333;border-radius:10px;color:#444;font-family:'Nunito',sans-serif;font-size:13px;cursor:pointer;transition:all .2s;}
+.btn-add:hover{border-color:var(--red);color:var(--red);}
+.btn-primary{width:100%;padding:16px;background:var(--red);border:none;border-radius:14px;color:#fff;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;cursor:pointer;transition:all .15s;box-shadow:0 4px 20px #ff222240;}
+.btn-primary:active{transform:scale(.97);}
+.mode-toggle{display:flex;gap:10px;width:100%;max-width:420px;}
+.mode-btn{flex:1;padding:12px;background:var(--card);border:2px solid #222;border-radius:12px;color:var(--muted);font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;text-align:center;}
+.mode-btn.active{background:#1a0000;border-color:var(--red);color:var(--red);}
+.mode-btn.active-green{background:#001a0d;border-color:var(--green);color:var(--green);}
+
+/* ─── ELDER SCREEN ─── */
+#elder{display:none;flex-direction:column;align-items:center;justify-content:space-between;min-height:100vh;padding:40px 20px;background:radial-gradient(ellipse at center,#1a0000 0%,#0a0a0a 70%);}
+.elder-greeting{text-align:center;}
+.elder-greeting .name{font-size:28px;font-weight:900;color:#fff;}
+.elder-greeting .time{font-size:48px;font-family:'Bebas Neue',sans-serif;color:var(--red);letter-spacing:4px;text-shadow:0 0 20px #ff222250;}
+.elder-greeting .date{font-size:14px;color:var(--muted);margin-top:4px;}
+
+.sos-wrapper{display:flex;flex-direction:column;align-items:center;gap:20px;}
+.sos-ring{position:relative;display:flex;align-items:center;justify-content:center;}
+.sos-ring::before,.sos-ring::after{content:'';position:absolute;border-radius:50%;border:2px solid var(--red);opacity:0;animation:none;}
+.sos-ring.pulsing::before{width:320px;height:320px;animation:ring1 1.5s ease-out infinite;}
+.sos-ring.pulsing::after{width:380px;height:380px;animation:ring2 1.5s ease-out .4s infinite;}
+@keyframes ring1{0%{opacity:.6;transform:scale(.8);}100%{opacity:0;transform:scale(1.1);}}
+@keyframes ring2{0%{opacity:.4;transform:scale(.8);}100%{opacity:0;transform:scale(1.1);}}
+
+.sos-btn{width:240px;height:240px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff4444,#cc0000,#880000);border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 0 0 8px #1a0000,0 0 0 16px #110000,0 8px 40px #ff000060;transition:transform .1s,box-shadow .1s;position:relative;z-index:2;user-select:none;-webkit-user-select:none;}
+.sos-btn:active,.sos-btn.pressing{transform:scale(.93);box-shadow:0 0 0 8px #2a0000,0 0 0 16px #1a0000,0 4px 20px #ff000080;}
+.sos-btn .sos-label{font-family:'Bebas Neue',sans-serif;font-size:72px;color:#fff;letter-spacing:4px;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.5);}
+.sos-btn .sos-sub{font-size:13px;color:rgba(255,255,255,.7);letter-spacing:2px;font-weight:700;}
+
+.sos-hint{font-size:13px;color:var(--muted);text-align:center;letter-spacing:1px;}
+
+.elder-contacts{width:100%;max-width:360px;}
+.elder-contacts .label{font-size:11px;letter-spacing:3px;color:var(--muted);text-align:center;margin-bottom:10px;}
+.contact-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.chip{padding:6px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:20px;font-size:12px;color:#aaa;}
+.chip.online{border-color:#22ff8840;color:var(--green);}
+
+/* ─── SENDING STATE ─── */
+.sos-status{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100;backdrop-filter:blur(10px);}
+.sos-status.hidden{display:none;}
+.status-icon{font-size:80px;animation:bounce .6s ease infinite alternate;}
+@keyframes bounce{from{transform:scale(1);}to{transform:scale(1.1);}}
+.status-title{font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:4px;}
+.status-msg{font-size:14px;color:var(--muted);text-align:center;max-width:300px;line-height:1.6;}
+.status-dots span{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 3px;animation:dot .8s ease infinite;}
+.status-dots span:nth-child(2){animation-delay:.2s;}
+.status-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes dot{0%,100%{opacity:.2;transform:scale(.8);}50%{opacity:1;transform:scale(1.2);}}
+.btn-cancel{padding:12px 32px;background:transparent;border:1.5px solid #333;border-radius:12px;color:#666;font-family:'Nunito',sans-serif;font-size:14px;cursor:pointer;margin-top:10px;}
+.btn-confirm-sent{padding:14px 40px;background:var(--green);border:none;border-radius:12px;color:#000;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:3px;cursor:pointer;}
+
+/* ─── CAREGIVER SCREEN ─── */
+#caregiver{display:none;flex-direction:column;min-height:100vh;}
+.cg-header{padding:16px 20px;display:flex;align-items:center;gap:12px;background:#0f0f0f;border-bottom:1px solid #1a1a1a;}
+.cg-logo{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:4px;color:var(--red);}
+.cg-status{flex:1;text-align:right;font-size:11px;color:var(--muted);letter-spacing:2px;}
+.cg-status .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.cg-body{flex:1;padding:16px;overflow-y:auto;}
+.cg-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:12px;opacity:.3;}
+.cg-empty .big{font-size:64px;}
+.cg-empty p{font-size:13px;letter-spacing:2px;color:var(--muted);}
+.alert-card{background:var(--card);border:1px solid #222;border-radius:16px;padding:18px;margin-bottom:12px;position:relative;overflow:hidden;transition:all .3s;}
+.alert-card.new{border-color:var(--red);background:#140000;animation:alertIn .4s ease;}
+.alert-card.new::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red),#ff6b6b,var(--red));background-size:200%;animation:shimmer 1.5s linear infinite;}
+@keyframes alertIn{from{transform:translateY(-20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+@keyframes shimmer{0%{background-position:200%;}100%{background-position:-200%;}}
+.alert-card.atendido{opacity:.5;border-color:#222;}
+.alert-card.atendido::before{display:none;}
+.ac-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.ac-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#cc0000,#ff4444);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;flex-shrink:0;}
+.ac-info{flex:1;}
+.ac-name{font-size:18px;font-weight:900;margin-bottom:2px;}
+.ac-time{font-size:11px;color:var(--muted);letter-spacing:1px;}
+.ac-badge{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:2px;}
+.ac-badge.nueva{background:#ff222220;border:1px solid #ff222240;color:var(--red);}
+.ac-badge.atendido{background:#22ff8820;border:1px solid #22ff8840;color:var(--green);}
+.ac-details{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.ac-detail{background:#1a1a1a;border-radius:10px;padding:10px 12px;}
+.ac-detail .dl{font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:3px;}
+.ac-detail .dv{font-size:13px;font-weight:700;}
+.ac-audio{background:#1a1a1a;border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.ac-audio .play-btn{width:36px;height:36px;border-radius:50%;background:var(--red);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0;}
+.ac-audio .audio-label{font-size:12px;color:#aaa;}
+.ac-audio audio{flex:1;height:32px;opacity:.7;}
+.ac-actions{display:flex;gap:8px;}
+.btn-atender{flex:2;padding:12px;background:var(--green);border:none;border-radius:12px;color:#000;font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:3px;cursor:pointer;transition:all .15s;}
+.btn-atender:active{transform:scale(.97);}
+.btn-atender:disabled{background:#1a1a1a;color:#333;cursor:default;}
+.btn-llamar{flex:1;padding:12px;background:#1a1a2e;border:1px solid #333;border-radius:12px;color:#7a7aff;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+.ac-gps{background:#001a0d;border:1px solid #22ff8820;border-radius:10px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;cursor:pointer;text-decoration:none;}
+.ac-gps .gps-icon{font-size:18px;}
+.ac-gps .gps-text{font-size:12px;color:var(--green);}
+.ac-gps .gps-coords{font-size:10px;color:var(--muted);font-family:monospace;}
+
+/* ─── ALERT OVERLAY for caregiver ─── */
+.alert-overlay{position:fixed;inset:0;background:rgba(180,0,0,.15);z-index:50;pointer-events:none;animation:alertFlash .5s ease infinite alternate;}
+.alert-overlay.hidden{display:none;}
+@keyframes alertFlash{from{opacity:0;}to{opacity:1;}}
+
+/* ─── RECORD ─── */
+.rec-indicator{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--red);}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse .8s infinite;}
+
+/* ─── BOTTOM NAV ─── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#0f0f0f;border-top:1px solid #1a1a1a;display:flex;padding:8px 0 20px;}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--muted);font-family:'Nunito',sans-serif;font-size:10px;cursor:pointer;padding:8px;position:relative;}
+.nav-btn.active{color:var(--red);}
+.nav-btn .nav-icon{font-size:22px;}
+.nav-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;}
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px 20px;font-size:13px;z-index:200;animation:toastIn .3s ease;white-space:nowrap;max-width:90vw;}
+.toast.error{border-color:#ff222250;color:var(--red);}
+.toast.success{border-color:#22ff8850;color:var(--green);}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════════════ SETUP ═══════════════ -->
+<div id="setup">
+  <div>
+    <div class="setup-logo">SOS</div>
+    <div class="setup-sub">SISTEMA DE AYUDA RAPIDA</div>
+  </div>
+
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btnModeElder" onclick="setMode('elder')">ADULTO MAYOR</button>
+    <button class="mode-btn" id="btnModeCaregiver" onclick="setMode('caregiver')">HIJO / CUIDADOR</button>
+  </div>
+
+  <div class="setup-card" id="elderSetup">
+    <h3>TUS DATOS</h3>
+    <div class="field">
+      <label>TU NOMBRE</label>
+      <input type="text" id="elderName" placeholder="Ej: Abuela Maria" maxlength="40"/>
+    </div>
+    <div class="field">
+      <label>CODIGO DE FAMILIA (comparte con tus hijos)</label>
+      <input type="text" id="familyCode" placeholder="Ej: familia-garcia-2024" maxlength="30" style="font-family:monospace;letter-spacing:2px;"/>
+    </div>
+  </div>
+
+  <div class="setup-card" id="caregiverSetup" style="display:none;">
+    <h3>TUS DATOS</h3>
+    <div class="field">
+      <label>TU NOMBRE</label>
+      <input type="text" id="caregiverName" placeholder="Ej: Juan (hijo)" maxlength="40"/>
+    </div>
+    <div class="field">
+      <label>CODIGO DE FAMILIA (el mismo que usa el adulto mayor)</label>
+      <input type="text" id="familyCode2" placeholder="Ej: familia-garcia-2024" maxlength="30" style="font-family:monospace;letter-spacing:2px;"/>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="startApp()">ENTRAR AL SISTEMA</button>
+  <div style="font-size:11px;color:#333;text-align:center;letter-spacing:1px;">Usa el mismo codigo de familia en todos los dispositivos</div>
+</div>
+
+<!-- ═══════════════ ELDER SCREEN ═══════════════ -->
+<div id="elder">
+  <div class="elder-greeting">
+    <div class="name" id="elderGreeting">Hola</div>
+    <div class="time" id="elderClock">--:--</div>
+    <div class="date" id="elderDate"></div>
+  </div>
+
+  <div class="sos-wrapper">
+    <div class="sos-ring" id="sosRing">
+      <button class="sos-btn" id="sosBtn"
+        ontouchstart="startPress()" ontouchend="endPress()"
+        onmousedown="startPress()" onmouseup="endPress()" onmouseleave="endPress()">
+        <span class="sos-label">SOS</span>
+        <span class="sos-sub">PRESIONA Y MANTÉN</span>
+      </button>
+    </div>
+    <div class="sos-hint" id="sosHint">Mantén presionado 2 segundos para pedir ayuda</div>
+  </div>
+
+  <div class="elder-contacts">
+    <div class="label">TUS CUIDADORES</div>
+    <div class="contact-chips" id="elderContactChips"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ SOS STATUS OVERLAY ═══════════════ -->
+<div class="sos-status hidden" id="sosStatus">
+  <div class="status-icon" id="statusIcon">📡</div>
+  <div class="status-title" id="statusTitle">ENVIANDO ALERTA</div>
+  <div class="status-msg" id="statusMsg">Estamos notificando a tus cuidadores ahora mismo</div>
+  <div class="status-dots" id="statusDots">
+    <span></span><span></span><span></span>
+  </div>
+  <button class="btn-cancel" id="statusCancelBtn" onclick="cancelSOS()">CANCELAR</button>
+</div>
+
+<!-- ═══════════════ CAREGIVER SCREEN ═══════════════ -->
+<div id="caregiver">
+  <div class="cg-header">
+    <div class="cg-logo">SOS</div>
+    <div style="font-size:12px;color:#aaa;" id="cgUserName"></div>
+    <div class="cg-status" id="cgStatus">
+      <span class="dot"></span>EN LINEA
+    </div>
+  </div>
+  <div class="cg-body" id="cgBody">
+    <div class="cg-empty" id="cgEmpty">
+      <div class="big">🛡️</div>
+      <p>SIN ALERTAS</p>
+      <p style="font-size:11px;">Todo tranquilo por ahora</p>
+    </div>
+  </div>
+  <div style="height:80px;"></div>
+</div>
+
+<!-- ═══════════════ ALERT OVERLAY ═══════════════ -->
+<div class="alert-overlay hidden" id="alertOverlay"></div>
+
+<script>
+var APP = {
+  mode: 'elder',
+  name: '',
+  familyCode: '',
+  pressTimer: null,
+  pressStart: null,
+  recording: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  audioBlob: null,
+  audioURL: null,
+  sending: false,
+  alerts: [],
+  knownAlertIds: new Set()
+};
+
+// ── Utils ──
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function nowStr(){
+  var d = new Date();
+  return d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'}) + ' ' +
+         d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function sanitizeKey(s){ return s.replace(/[.#$\[\]/]/g,'-').toLowerCase().replace(/\s+/g,'-'); }
+
+function showToast(msg, type, duration){
+  var el = document.createElement('div');
+  el.className = 'toast ' + (type||'');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ el.remove(); }, duration||3000);
+}
+
+// ── Mode toggle ──
+function setMode(m){
+  APP.mode = m;
+  document.getElementById('btnModeElder').className = 'mode-btn' + (m==='elder'?' active':'');
+  document.getElementById('btnModeCaregiver').className = 'mode-btn' + (m==='caregiver'?' active-green':'');
+  document.getElementById('elderSetup').style.display = m==='elder'?'block':'none';
+  document.getElementById('caregiverSetup').style.display = m==='caregiver'?'block':'none';
+}
+
+// ── Clock ──
+function startClock(){
+  function tick(){
+    var now = new Date();
+    var h = now.getHours().toString().padStart(2,'0');
+    var m = now.getMinutes().toString().padStart(2,'0');
+    document.getElementById('elderClock').textContent = h + ':' + m;
+    document.getElementById('elderDate').textContent = now.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+  }
+  tick();
+  setInterval(tick, 10000);
+}
+
+// ── Start App ──
+function startApp(){
+  if(APP.mode === 'elder'){
+    var name = document.getElementById('elderName').value.trim();
+    var code = document.getElementById('familyCode').value.trim();
+    if(!name){ showToast('Escribe tu nombre', 'error'); return; }
+    if(!code){ showToast('Escribe el codigo de familia', 'error'); return; }
+    APP.name = name;
+    APP.familyCode = sanitizeKey(code);
+    localStorage.setItem('sos_mode','elder');
+    localStorage.setItem('sos_name', name);
+    localStorage.setItem('sos_code', APP.familyCode);
+    showElderScreen();
+  } else {
+    var name2 = document.getElementById('caregiverName').value.trim();
+    var code2 = document.getElementById('familyCode2').value.trim();
+    if(!name2){ showToast('Escribe tu nombre', 'error'); return; }
+    if(!code2){ showToast('Escribe el codigo de familia', 'error'); return; }
+    APP.name = name2;
+    APP.familyCode = sanitizeKey(code2);
+    localStorage.setItem('sos_mode','caregiver');
+    localStorage.setItem('sos_name', name2);
+    localStorage.setItem('sos_code', APP.familyCode);
+    showCaregiverScreen();
+  }
+}
+
+// ── Elder Screen ──
+function showElderScreen(){
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('elder').style.display = 'flex';
+  document.getElementById('elderGreeting').textContent = 'Hola, ' + APP.name.split(' ')[0];
+  startClock();
+  listenCaregivers();
+  requestNotifPermission();
+}
+
+function listenCaregivers(){
+  if(!window.db) return;
+  var ref = window.db.ref('sos/' + APP.familyCode + '/caregivers');
+  ref.on('value', function(snap){
+    var data = snap.val() || {};
+    var chips = document.getElementById('elderContactChips');
+    chips.innerHTML = '';
+    var keys = Object.keys(data);
+    if(!keys.length){
+      chips.innerHTML = '<div style="font-size:12px;color:#444;letter-spacing:1px;">Aun sin cuidadores conectados</div>';
+      return;
+    }
+    keys.forEach(function(k){
+      var c = data[k];
+      var chip = document.createElement('div');
+      chip.className = 'chip online';
+      chip.textContent = c.name;
+      chips.appendChild(chip);
+    });
+  });
+}
+
+// ── PRESS LOGIC ──
+var pressInterval = null;
+var pressProgress = 0;
+
+function startPress(){
+  if(APP.sending) return;
+  APP.pressStart = Date.now();
+  pressProgress = 0;
+  document.getElementById('sosBtn').classList.add('pressing');
+
+  // Vibrate
+  try{ navigator.vibrate && navigator.vibrate([100,50,100]); }catch(e){}
+
+  pressInterval = setInterval(function(){
+    pressProgress += 50;
+    if(pressProgress >= 2000){
+      clearInterval(pressInterval);
+      pressInterval = null;
+      triggerSOS();
+    }
+  }, 50);
+}
+
+function endPress(){
+  if(pressInterval){
+    clearInterval(pressInterval);
+    pressInterval = null;
+    document.getElementById('sosBtn').classList.remove('pressing');
+    document.getElementById('sosRing').classList.remove('pulsing');
+    if(pressProgress > 200 && pressProgress < 2000){
+      showToast('Mantén presionado mas tiempo', '', 2000);
+    }
+    pressProgress = 0;
+  }
+}
+
+// ── TRIGGER SOS ──
+function triggerSOS(){
+  document.getElementById('sosBtn').classList.remove('pressing');
+  document.getElementById('sosRing').classList.add('pulsing');
+  APP.sending = true;
+
+  // Vibrate SOS pattern
+  try{ navigator.vibrate && navigator.vibrate([200,100,200,100,200,300,200,100,200,100,200]); }catch(e){}
+
+  // Show status
+  showSOSStatus('grabando');
+
+  // Get GPS + record audio simultaneously
+  var gpsData = null;
+  var gpsPromise = new Promise(function(resolve){
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve({lat: pos.coords.latitude, lng: pos.coords.longitude, acc: Math.round(pos.coords.accuracy)}); },
+      function(){ resolve(null); },
+      {timeout: 8000, enableHighAccuracy: true}
+    );
+  });
+
+  // Record 5 seconds of audio
+  recordAudio(5000).then(function(blob){
+    APP.audioBlob = blob;
+    return gpsPromise;
+  }).then(function(gps){
+    gpsData = gps;
+    return sendAlert(gpsData);
+  }).catch(function(){
+    // Even if audio/gps fails, send the alert
+    return sendAlert(null);
+  });
+}
+
+function showSOSStatus(phase){
+  var overlay = document.getElementById('sosStatus');
+  overlay.classList.remove('hidden');
+
+  if(phase === 'grabando'){
+    document.getElementById('statusIcon').textContent = '🎙️';
+    document.getElementById('statusTitle').textContent = 'GRABANDO MENSAJE';
+    document.getElementById('statusMsg').textContent = 'Habla ahora... describe lo que necesitas';
+    document.getElementById('statusDots').style.display = 'flex';
+    document.getElementById('statusCancelBtn').style.display = 'block';
+  } else if(phase === 'enviando'){
+    document.getElementById('statusIcon').textContent = '📡';
+    document.getElementById('statusTitle').textContent = 'ENVIANDO ALERTA';
+    document.getElementById('statusMsg').textContent = 'Notificando a tus cuidadores ahora mismo...';
+    document.getElementById('statusDots').style.display = 'flex';
+    document.getElementById('statusCancelBtn').style.display = 'block';
+  } else if(phase === 'enviado'){
+    document.getElementById('statusIcon').textContent = '✅';
+    document.getElementById('statusTitle').textContent = 'ALERTA ENVIADA';
+    document.getElementById('statusMsg').textContent = 'Tus cuidadores ya fueron notificados. Alguien esta en camino.';
+    document.getElementById('statusDots').style.display = 'none';
+    document.getElementById('statusCancelBtn').style.display = 'none';
+    var okBtn = document.createElement('button');
+    okBtn.className = 'btn-confirm-sent';
+    okBtn.textContent = 'ENTENDIDO';
+    okBtn.onclick = function(){ 
+      document.getElementById('sosStatus').classList.add('hidden');
+      document.getElementById('sosRing').classList.remove('pulsing');
+      APP.sending = false;
+      APP.audioBlob = null;
+    };
+    document.getElementById('sosStatus').appendChild(okBtn);
+    try{ navigator.vibrate && navigator.vibrate([100,50,100,50,300]); }catch(e){}
+  }
+}
+
+function cancelSOS(){
+  if(APP.mediaRecorder && APP.mediaRecorder.state !== 'inactive'){
+    try{ APP.mediaRecorder.stop(); }catch(e){}
+  }
+  document.getElementById('sosStatus').classList.add('hidden');
+  document.getElementById('sosRing').classList.remove('pulsing');
+  APP.sending = false;
+  APP.audioBlob = null;
+}
+
+// ── RECORD AUDIO ──
+function recordAudio(duration){
+  return new Promise(function(resolve, reject){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      resolve(null); return;
+    }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      var chunks = [];
+      var mr = new MediaRecorder(stream);
+      APP.mediaRecorder = mr;
+      mr.ondataavailable = function(e){ if(e.data.size>0) chunks.push(e.data); };
+      mr.onstop = function(){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        var blob = new Blob(chunks, {type:'audio/webm'});
+        resolve(blob);
+      };
+      mr.start();
+      setTimeout(function(){
+        if(mr.state !== 'inactive') mr.stop();
+      }, duration);
+    }).catch(function(){ resolve(null); });
+  });
+}
+
+// ── SEND ALERT ──
+function sendAlert(gps){
+  showSOSStatus('enviando');
+
+  var alertId = uid();
+  var alertData = {
+    id: alertId,
+    elderName: APP.name,
+    timestamp: nowStr(),
+    ts: Date.now(),
+    status: 'nueva',
+    gps: gps || null,
+    audioBase64: null
+  };
+
+  function pushAlert(){
+    if(!window.db){ showToast('Sin conexion', 'error'); APP.sending=false; return; }
+    window.db.ref('sos/' + APP.familyCode + '/alerts/' + alertId).set(alertData).then(function(){
+      showSOSStatus('enviado');
+    }).catch(function(){
+      showToast('Error al enviar', 'error');
+      APP.sending = false;
+    });
+  }
+
+  // Convert audio to base64 if available
+  if(APP.audioBlob){
+    var reader = new FileReader();
+    reader.onload = function(e){
+      alertData.audioBase64 = e.target.result;
+      pushAlert();
+    };
+    reader.readAsDataURL(APP.audioBlob);
+  } else {
+    pushAlert();
+  }
+}
+
+// ── CAREGIVER SCREEN ──
+function showCaregiverScreen(){
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('caregiver').style.display = 'flex';
+  document.getElementById('cgUserName').textContent = APP.name;
+  requestNotifPermission();
+  registerCaregiver();
+  listenAlerts();
+}
+
+function registerCaregiver(){
+  if(!window.db) return;
+  var cgId = localStorage.getItem('sos_cgid') || uid();
+  localStorage.setItem('sos_cgid', cgId);
+  window.db.ref('sos/' + APP.familyCode + '/caregivers/' + cgId).set({
+    name: APP.name,
+    online: true,
+    lastSeen: nowStr()
+  });
+  // Mark offline on disconnect
+  window.db.ref('sos/' + APP.familyCode + '/caregivers/' + cgId + '/online').onDisconnect().set(false);
+}
+
+// ── LISTEN ALERTS ──
+function listenAlerts(){
+  if(!window.db) return;
+  var ref = window.db.ref('sos/' + APP.familyCode + '/alerts');
+  ref.orderByChild('ts').on('value', function(snap){
+    var data = snap.val() || {};
+    var alerts = Object.values(data).sort(function(a,b){ return b.ts - a.ts; });
+
+    // Detect NEW alerts
+    alerts.forEach(function(a){
+      if(!APP.knownAlertIds.has(a.id) && a.status === 'nueva'){
+        if(APP.knownAlertIds.size > 0){ // Not first load
+          triggerCaregiverAlert(a);
+        }
+        APP.knownAlertIds.add(a.id);
+      } else {
+        APP.knownAlertIds.add(a.id);
+      }
+    });
+
+    renderAlerts(alerts);
+  });
+}
+
+function triggerCaregiverAlert(alert){
+  // Sound
+  playAlertSound();
+  // Vibrate
+  try{ navigator.vibrate && navigator.vibrate([300,100,300,100,300,200,300,100,300]); }catch(e){}
+  // Flash overlay
+  var ov = document.getElementById('alertOverlay');
+  ov.classList.remove('hidden');
+  setTimeout(function(){ ov.classList.add('hidden'); }, 4000);
+  // Browser notification
+  try{
+    if(window.Notification && Notification.permission === 'granted'){
+      new Notification('🚨 SOS - ' + alert.elderName, {
+        body: 'Necesita ayuda urgente - ' + alert.timestamp,
+        tag: 'sos-alert',
+        requireInteraction: true,
+        vibrate: [300,100,300]
+      });
+    }
+  }catch(e){}
+  showToast('🚨 ALERTA DE ' + alert.elderName.toUpperCase(), 'error', 6000);
+}
+
+function playAlertSound(){
+  try{
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    function beep(f, start, dur){
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'square';
+      o.frequency.setValueAtTime(f, ctx.currentTime + start);
+      g.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+      o.start(ctx.currentTime + start);
+      o.stop(ctx.currentTime + start + dur + 0.05);
+    }
+    // SOS pattern: ... --- ...
+    [0,.15,.30,.55,.70,.85,1.2,1.5,1.8].forEach(function(t){ beep(880, t, .1); });
+    [1.1,1.4,1.7].forEach(function(t){ beep(440, t, .25); });
+    setTimeout(function(){ playAlertSound2(ctx); }, 2500);
+  }catch(e){}
+}
+
+function playAlertSound2(ctx){
+  try{
+    [0,.2,.4,.6,.8,1.0,1.2].forEach(function(t,i){
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(600 + i*80, ctx.currentTime + t);
+      g.gain.setValueAtTime(0.15, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + .15);
+      o.start(ctx.currentTime + t);
+      o.stop(ctx.currentTime + t + .2);
+    });
+  }catch(e){}
+}
+
+// ── RENDER ALERTS ──
+function renderAlerts(alerts){
+  var body = document.getElementById('cgBody');
+  var empty = document.getElementById('cgEmpty');
+
+  if(!alerts.length){
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+
+  // Count new
+  var newCount = alerts.filter(function(a){ return a.status==='nueva'; }).length;
+  document.title = newCount > 0 ? ('(' + newCount + ') SOS - Alertas') : 'SOS - Sistema';
+
+  // Rebuild list
+  var existing = body.querySelectorAll('.alert-card');
+  existing.forEach(function(el){ el.remove(); });
+
+  alerts.forEach(function(alert){
+    var card = document.createElement('div');
+    card.className = 'alert-card' + (alert.status==='nueva'?' new':' atendido');
+    card.id = 'alert-' + alert.id;
+
+    var initials = (alert.elderName||'?').split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
+    var gpsHtml = '';
+    if(alert.gps){
+      var mapsUrl = 'https://maps.google.com/?q=' + alert.gps.lat + ',' + alert.gps.lng;
+      gpsHtml = '<a class="ac-gps" href="' + mapsUrl + '" target="_blank">' +
+        '<span class="gps-icon">📍</span>' +
+        '<div><div class="gps-text">VER UBICACION EN MAPS</div>' +
+        '<div class="gps-coords">' + alert.gps.lat.toFixed(5) + ', ' + alert.gps.lng.toFixed(5) + ' (~' + (alert.gps.acc||'?') + 'm)</div></div>' +
+        '</a>';
+    }
+
+    var audioHtml = '';
+    if(alert.audioBase64){
+      audioHtml = '<div class="ac-audio">' +
+        '<span style="font-size:13px;color:#aaa;">🎙️ Mensaje de voz</span>' +
+        '<audio controls src="' + alert.audioBase64 + '" style="flex:1;height:30px;"></audio>' +
+        '</div>';
+    }
+
+    var btnLabel = alert.status==='nueva' ? 'YA VOY' : 'ATENDIDO';
+    var btnDisabled = alert.status!=='nueva' ? 'disabled' : '';
+
+    card.innerHTML =
+      '<div class="ac-top">' +
+        '<div class="ac-avatar">' + initials + '</div>' +
+        '<div class="ac-info">' +
+          '<div class="ac-name">' + (alert.elderName||'Adulto mayor') + '</div>' +
+          '<div class="ac-time">' + (alert.timestamp||'') + '</div>' +
+        '</div>' +
+        '<span class="ac-badge ' + (alert.status==='nueva'?'nueva':'atendido') + '">' +
+          (alert.status==='nueva' ? 'NUEVA' : 'ATENDIDO') +
+        '</span>' +
+      '</div>' +
+      '<div class="ac-details">' +
+        '<div class="ac-detail"><div class="dl">ALERTA</div><div class="dv" style="color:' + (alert.status==='nueva'?'var(--red)':'var(--green)') + '">SOS</div></div>' +
+        '<div class="ac-detail"><div class="dl">ESTADO</div><div class="dv">' + (alert.status==='nueva'?'Pendiente':'Atendida') + '</div></div>' +
+      '</div>' +
+      gpsHtml +
+      audioHtml +
+      '<div class="ac-actions">' +
+        '<button class="btn-atender" ' + btnDisabled + ' onclick="atenderAlerta(\'' + alert.id + '\')">' + btnLabel + '</button>' +
+      '</div>';
+
+    body.insertBefore(card, body.firstChild);
+  });
+}
+
+function atenderAlerta(alertId){
+  if(!window.db) return;
+  window.db.ref('sos/' + APP.familyCode + '/alerts/' + alertId + '/status').set('atendido');
+  window.db.ref('sos/' + APP.familyCode + '/alerts/' + alertId + '/atendidoPor').set(APP.name);
+  window.db.ref('sos/' + APP.familyCode + '/alerts/' + alertId + '/atendidoAt').set(nowStr());
+  showToast('Marcado como atendido', 'success');
+  try{ navigator.vibrate && navigator.vibrate([100,50,200]); }catch(e){}
+}
+
+// ── NOTIFICATIONS ──
+function requestNotifPermission(){
+  try{
+    if(window.Notification && Notification.permission === 'default'){
+      Notification.requestPermission();
+    }
+  }catch(e){}
+}
+
+// ── AUTO-LOAD saved session ──
+window.addEventListener('load', function(){
+  var savedMode = localStorage.getItem('sos_mode');
+  var savedName = localStorage.getItem('sos_name');
+  var savedCode = localStorage.getItem('sos_code');
+
+  if(savedMode && savedName && savedCode){
+    APP.mode = savedMode;
+    APP.name = savedName;
+    APP.familyCode = savedCode;
+    if(savedMode === 'elder'){
+      showElderScreen();
+    } else {
+      showCaregiverScreen();
+    }
+  }
+});
+
+// ── RESET ──
+function resetApp(){
+  localStorage.removeItem('sos_mode');
+  localStorage.removeItem('sos_name');
+  localStorage.removeItem('sos_code');
+  location.reload();
+}
+</script>
+</body>
+</html>
