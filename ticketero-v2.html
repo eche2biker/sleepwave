@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Ticketero MX</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Unbounded:wght@400;600;700;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07080f;--s1:#0e0f1a;--s2:#161728;--s3:#1e2035;
+  --border:#252640;--border2:#2e3055;
+  --green:#00e87a;--red:#ff4466;--amber:#ffb020;--blue:#4488ff;--purple:#aa44ff;
+  --text:#dde2f0;--muted:#5a5f80;--muted2:#7a7fa0;
+  --font:'Manrope',sans-serif;--mono:'DM Mono',monospace;--display:'Unbounded',sans-serif;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:var(--font)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--s1)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* NOISE OVERLAY */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity:0.025;pointer-events:none;z-index:9999;
+}
+
+/* LAYOUT */
+.layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:240px;min-width:240px;background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.content{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+/* SIDEBAR */
+.logo-wrap{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.logo-main{font-family:var(--display);font-size:16px;font-weight:900;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:3px;margin-top:3px;text-transform:uppercase}
+
+.nav{padding:12px 10px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--muted2);font-size:13px;font-weight:600;transition:all 0.15s;margin-bottom:2px;border:1px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--s2)}
+.nav-item.active{color:var(--green);background:rgba(0,232,122,0.07);border-color:rgba(0,232,122,0.15)}
+.nav-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:14px}
+
+.sidebar-bottom{padding:14px;border-top:1px solid var(--border)}
+.balance-card{background:linear-gradient(135deg,rgba(0,232,122,0.08),rgba(68,136,255,0.08));border:1px solid rgba(0,232,122,0.2);border-radius:10px;padding:12px 14px}
+.balance-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.balance-amount{font-family:var(--display);font-size:22px;font-weight:900;color:var(--green);margin-top:4px;letter-spacing:-1px}
+.balance-sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* TOPBAR */
+.topbar{padding:20px 28px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.page-title{font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:-1px}
+.page-title em{color:var(--green);font-style:normal}
+.page-subtitle{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-family:var(--font);font-weight:700;font-size:12px;cursor:pointer;transition:all 0.15s;border:none;letter-spacing:0.3px}
+.btn-primary{background:var(--green);color:#000}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,232,122,0.25)}
+.btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--green);color:var(--green)}
+.btn-danger{background:rgba(255,68,102,0.12);color:var(--red);border:1px solid rgba(255,68,102,0.2)}
+.btn-danger:hover{background:rgba(255,68,102,0.2)}
+.btn-sm{padding:6px 12px;font-size:11px}
+.btn-icon{padding:7px;border-radius:7px;background:var(--s2);border:1px solid var(--border);color:var(--muted2);cursor:pointer;transition:all 0.15s;font-size:13px;display:flex;align-items:center;justify-content:center}
+.btn-icon:hover{border-color:var(--green);color:var(--green)}
+
+/* PAGE CONTENT */
+.page-body{padding:20px 28px 28px;flex:1}
+
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;transition:border-color 0.2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-glow{position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(20px);opacity:0.3}
+.stat-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.stat-val{font-family:var(--display);font-size:24px;font-weight:900;margin:8px 0 3px;letter-spacing:-1px}
+.stat-hint{font-size:11px;color:var(--muted2)}
+.stat-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-top:4px}
+.badge-up{background:rgba(0,232,122,0.12);color:var(--green)}
+.badge-dn{background:rgba(255,68,102,0.12);color:var(--red)}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:20px}
+.chart-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px}
+.chart-card-full{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px}
+.chart-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+canvas{max-height:200px}
+
+/* TICKETS */
+.filter-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.search-wrap{position:relative;flex:1;min-width:180px}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.search-input{width:100%;background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 32px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.2s}
+.search-input:focus{border-color:var(--green)}
+.pill{padding:6px 13px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid var(--border);cursor:pointer;transition:all 0.15s;color:var(--muted2);background:var(--s1)}
+.pill:hover,.pill.on{border-color:var(--green);color:var(--green);background:rgba(0,232,122,0.07)}
+
+.ticket-table{width:100%;border-collapse:separate;border-spacing:0 6px}
+.ticket-table th{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 14px 6px;text-align:left;font-weight:500}
+.ticket-row-tr{background:var(--s1);transition:all 0.15s;cursor:pointer}
+.ticket-row-tr:hover{background:var(--s2)}
+.ticket-row-tr td{padding:12px 14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.ticket-row-tr td:first-child{border-left:1px solid var(--border);border-radius:10px 0 0 10px}
+.ticket-row-tr td:last-child{border-right:1px solid var(--border);border-radius:0 10px 10px 0}
+.ticket-row-tr:hover td{border-color:rgba(0,232,122,0.2)}
+.store-cell{display:flex;align-items:center;gap:10px}
+.store-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--s2)}
+.store-name{font-weight:700;font-size:13px}
+.store-date{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+.amount-cell{font-family:var(--display);font-size:15px;font-weight:900;color:var(--green);white-space:nowrap}
+.actions-cell{display:flex;gap:6px;align-items:center}
+
+/* CAT TAGS */
+.cat-tag{font-size:9px;font-weight:700;letter-spacing:0.5px;padding:3px 9px;border-radius:20px;text-transform:uppercase}
+.ct-Supermercado{background:rgba(0,232,122,0.12);color:var(--green)}
+.ct-Ropa{background:rgba(255,68,102,0.12);color:var(--red)}
+.ct-Gasolinera{background:rgba(255,176,32,0.12);color:var(--amber)}
+.ct-Tecnología{background:rgba(68,136,255,0.12);color:var(--blue)}
+.ct-Restaurante{background:rgba(170,68,255,0.12);color:var(--purple)}
+.ct-Farmacia{background:rgba(255,150,50,0.12);color:#ff9632}
+.ct-Conveniencia{background:rgba(100,200,255,0.12);color:#64c8ff}
+.ct-Entretenimiento{background:rgba(255,100,200,0.12);color:#ff64c8}
+.ct-Otro{background:rgba(120,120,160,0.12);color:var(--muted2)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:16px;width:520px;max-width:95vw;max-height:92vh;overflow-y:auto;animation:popIn 0.2s ease}
+@keyframes popIn{from{transform:scale(0.95) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.modal-head{padding:22px 24px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.modal-title-text{font-family:var(--display);font-size:16px;font-weight:900;letter-spacing:-0.5px}
+.modal-body{padding:22px 24px}
+
+/* FORM */
+.tabs-row{display:flex;gap:4px;background:var(--s2);border-radius:8px;padding:4px;margin-bottom:18px}
+.ftab{flex:1;padding:7px;text-align:center;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);transition:all 0.15s}
+.ftab.on{background:var(--green);color:#000}
+.fg{margin-bottom:14px}
+.flabel{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block}
+.fc{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.2s}
+.fc:focus{border-color:var(--green)}
+.fc option{background:var(--s2)}
+.fc::placeholder{color:var(--muted)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* SCAN */
+.scan-drop{border:2px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
+.scan-drop:hover{border-color:var(--green);background:rgba(0,232,122,0.03)}
+.scan-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.scan-emoji{font-size:32px;margin-bottom:8px}
+.scan-hint{font-size:12px;color:var(--muted)}
+.scan-hint strong{color:var(--green)}
+.ai-status{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:8px;font-size:12px;margin-top:10px}
+.ai-loading{background:rgba(68,136,255,0.08);border:1px solid rgba(68,136,255,0.2);color:var(--blue)}
+.ai-ok{background:rgba(0,232,122,0.08);border:1px solid rgba(0,232,122,0.2);color:var(--green)}
+.ai-err{background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.2);color:var(--red)}
+.spin{width:13px;height:13px;border:2px solid rgba(68,136,255,0.3);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TICKET DETAIL DRAWER */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;display:flex;justify-content:flex-end}
+.drawer{width:400px;max-width:95vw;background:var(--s1);border-left:1px solid var(--border2);height:100%;overflow-y:auto;animation:slideIn 0.22s ease}
+@keyframes slideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
+.drawer-head{padding:22px 22px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.drawer-body{padding:22px}
+.drawer-amount{font-family:var(--display);font-size:40px;font-weight:900;color:var(--green);letter-spacing:-2px;margin:12px 0 4px}
+.drawer-store{font-size:22px;font-weight:800}
+.drawer-meta{display:flex;gap:8px;align-items:center;margin:10px 0 20px;flex-wrap:wrap}
+.divider{height:1px;background:var(--border);margin:18px 0}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.detail-label{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.detail-val{font-size:13px;font-weight:600}
+.edit-field{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:7px;padding:7px 11px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.2s}
+.edit-field:focus{border-color:var(--green)}
+.edit-field option{background:var(--s2)}
+
+/* TIMELINE */
+.tl-day{margin-bottom:22px}
+.tl-date-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:0 0 10px 20px;border-left:2px solid var(--border);margin-left:7px}
+.tl-items{border-left:2px solid var(--border);margin-left:7px;padding-left:16px;display:flex;flex-direction:column;gap:6px}
+.tl-item{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;gap:10px;align-items:center;position:relative;cursor:pointer;transition:all 0.15s}
+.tl-item::before{content:'';position:absolute;left:-23px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:var(--green);border:2px solid var(--bg)}
+.tl-item:hover{border-color:rgba(0,232,122,0.25)}
+
+/* COMPARATIVAS */
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* EMPTY */
+.empty{text-align:center;padding:56px 20px;color:var(--muted)}
+.empty-ico{font-size:44px;margin-bottom:12px;opacity:0.35}
+.empty-msg{font-size:13px;color:var(--muted2)}
+
+/* EXPORT MODAL */
+.export-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.export-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:all 0.2s;text-align:center}
+.export-card:hover{border-color:var(--green);background:rgba(0,232,122,0.05)}
+.export-card.selected{border-color:var(--green);background:rgba(0,232,122,0.08)}
+.export-icon{font-size:32px;margin-bottom:8px}
+.export-name{font-weight:800;font-size:14px;margin-bottom:4px}
+.export-desc{font-size:11px;color:var(--muted2)}
+.export-range{display:flex;gap:8px;margin-bottom:16px}
+.export-range-btn{flex:1;padding:8px;border-radius:8px;background:var(--s2);border:1px solid var(--border);color:var(--muted2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;text-align:center}
+.export-range-btn:hover,.export-range-btn.on{border-color:var(--green);color:var(--green);background:rgba(0,232,122,0.07)}
+.export-preview{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--muted2);font-family:var(--mono)}
+.export-preview strong{color:var(--green)}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:24px;right:24px;z-index:9000;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;animation:toastIn 0.2s ease;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+@keyframes toastIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast-ok{border-color:rgba(0,232,122,0.3);color:var(--green)}
+.toast-err{border-color:rgba(255,68,102,0.3);color:var(--red)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+/* ─── CONSTANTS ─── */
+const CATS={
+  'Supermercado':{e:'🛒'},'Ropa':{e:'👕'},'Gasolinera':{e:'⛽'},
+  'Tecnología':{e:'💻'},'Restaurante':{e:'🍽️'},'Farmacia':{e:'💊'},
+  'Conveniencia':{e:'🏪'},'Entretenimiento':{e:'🎬'},'Otro':{e:'📦'}
+};
+const STORES=['Walmart','Soriana','Chedraui','La Comer','HEB','Sam\'s Club','Costco','Bodega Aurrerá',
+  'Oxxo','7-Eleven','FEMSA','Super Manzana','Liverpool','El Palacio de Hierro','C&A','Zara','H&M',
+  'Nike','Adidas','Shasa','Pemex','BP','Total Energies','Mobil','Farmacias del Ahorro',
+  'Farmacias Guadalajara','Best Buy','Office Depot','Coppel','McDonald\'s','Burger King','KFC',
+  'Domino\'s','Starbucks','VIPS','Chili\'s','Elektra','Telcel','AT&T','Cinépolis','Cinemex'];
+
+const CHART_COLORS=['#00e87a','#ff4466','#ffb020','#4488ff','#aa44ff','#ff9632','#64c8ff','#ff64c8'];
+
+function fmt(n){return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n)}
+function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
+function todayStr(){return new Date().toISOString().split('T')[0]}
+function monthStr(date=new Date()){return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
+
+/* ─── EXPORT FUNCTIONS ─── */
+function filterByRange(tickets, range){
+  const now=new Date();
+  if(range==='mes'){const m=monthStr();return tickets.filter(t=>t.date.startsWith(m))}
+  if(range==='trimestre'){const d=new Date(now);d.setMonth(d.getMonth()-3);const from=d.toISOString().split('T')[0];return tickets.filter(t=>t.date>=from)}
+  if(range==='año'){const y=now.getFullYear();return tickets.filter(t=>t.date.startsWith(String(y)))}
+  return tickets;
+}
+
+function exportExcel(tickets, range){
+  const data=filterByRange(tickets,range);
+  if(!data.length)return false;
+
+  // Hoja de tickets
+  const rows=data.map(t=>({
+    'Tienda':t.store,
+    'Categoría':t.category,
+    'Monto':t.amount,
+    'Fecha':t.date,
+    'Hora':t.time||'',
+    'No. Ticket':t.ticketNum||'',
+    'Ciudad':t.city||'',
+    'Notas':t.notes||''
+  }));
+
+  // Resumen por categoría
+  const catTotals={};
+  data.forEach(t=>{catTotals[t.category]=(catTotals[t.category]||0)+t.amount});
+  const resumen=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,total])=>({
+    'Categoría':cat,'Total':total,'Tickets':data.filter(t=>t.category===cat).length
+  }));
+
+  const wb=XLSX.utils.book_new();
+  const ws1=XLSX.utils.json_to_sheet(rows);
+  const ws2=XLSX.utils.json_to_sheet(resumen);
+
+  // Ancho de columnas
+  ws1['!cols']=[{wch:22},{wch:16},{wch:12},{wch:12},{wch:8},{wch:14},{wch:16},{wch:30}];
+  ws2['!cols']=[{wch:18},{wch:14},{wch:10}];
+
+  XLSX.utils.book_append_sheet(wb,ws1,'Tickets');
+  XLSX.utils.book_append_sheet(wb,ws2,'Resumen por Categoría');
+
+  const rangeLabel={'mes':'Mes','trimestre':'Trimestre','año':'Año','todo':'Historico'}[range]||'';
+  XLSX.writeFile(wb,`Ticketero_MX_${rangeLabel}_${todayStr()}.xlsx`);
+  return true;
+}
+
+function exportPDF(tickets, range){
+  const data=filterByRange(tickets,range);
+  if(!data.length)return false;
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+
+  const total=data.reduce((s,t)=>s+t.amount,0);
+  const rangeLabel={'mes':'Este Mes','trimestre':'Último Trimestre','año':'Este Año','todo':'Histórico'}[range]||'';
+
+  // Header
+  doc.setFillColor(14,15,26);
+  doc.rect(0,0,210,40,'F');
+  doc.setTextColor(0,232,122);
+  doc.setFontSize(22);
+  doc.setFont('helvetica','bold');
+  doc.text('Ticketero MX',14,18);
+  doc.setFontSize(10);
+  doc.setTextColor(90,95,128);
+  doc.text(`Reporte de Gastos · ${rangeLabel}`,14,26);
+  doc.text(`Generado: ${new Date().toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})}`,14,32);
+
+  // Total badge
+  doc.setFillColor(0,232,122);
+  doc.roundedRect(140,10,56,22,4,4,'F');
+  doc.setTextColor(0,0,0);
+  doc.setFontSize(8);
+  doc.text('TOTAL',168,18,{align:'center'});
+  doc.setFontSize(14);
+  doc.text(fmt(total),168,26,{align:'center'});
+
+  // Stats row
+  const catTotals={};
+  data.forEach(t=>{catTotals[t.category]=(catTotals[t.category]||0)+t.amount});
+  const topCat=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+
+  doc.setFillColor(22,23,40);
+  doc.rect(0,40,210,22,'F');
+  doc.setTextColor(90,95,128);doc.setFontSize(7);
+  doc.text('TICKETS',14,48);doc.text('PROMEDIO',70,48);doc.text('CATEGORÍA TOP',126,48);
+  doc.setTextColor(221,226,240);doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text(String(data.length),14,56);
+  doc.text(fmt(data.length?total/data.length:0),70,56);
+  doc.text(topCat?topCat[0]:'—',126,56);
+
+  // Resumen por categoría
+  doc.setTextColor(0,232,122);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text('RESUMEN POR CATEGORÍA',14,72);
+
+  const catRows=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,tot])=>[
+    cat,
+    String(data.filter(t=>t.category===cat).length),
+    fmt(tot),
+    `${(tot/total*100).toFixed(1)}%`
+  ]);
+
+  doc.autoTable({
+    startY:75,
+    head:[['Categoría','Tickets','Total','% del gasto']],
+    body:catRows,
+    theme:'plain',
+    styles:{font:'helvetica',fontSize:9,cellPadding:4,textColor:[221,226,240],fillColor:[14,15,26]},
+    headStyles:{textColor:[0,232,122],fontStyle:'bold',fillColor:[22,23,40],fontSize:8},
+    alternateRowStyles:{fillColor:[18,19,32]},
+    columnStyles:{1:{halign:'center'},2:{halign:'right'},3:{halign:'right'}},
+    margin:{left:14,right:14}
+  });
+
+  // Tabla de tickets
+  const startY=doc.lastAutoTable.finalY+10;
+  doc.setTextColor(0,232,122);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text('DETALLE DE TICKETS',14,startY);
+
+  const ticketRows=data.slice(0,80).map(t=>[
+    t.date+(t.time?` ${t.time}`:''),
+    t.store,
+    t.category,
+    fmt(t.amount),
+    t.city||'',
+    t.ticketNum||t.notes||''
+  ]);
+
+  doc.autoTable({
+    startY:startY+4,
+    head:[['Fecha / Hora','Tienda','Categoría','Monto','Ciudad','Folio / Notas']],
+    body:ticketRows,
+    theme:'plain',
+    styles:{font:'helvetica',fontSize:8,cellPadding:3.5,textColor:[221,226,240],fillColor:[14,15,26]},
+    headStyles:{textColor:[0,232,122],fontStyle:'bold',fillColor:[22,23,40],fontSize:7.5},
+    alternateRowStyles:{fillColor:[18,19,32]},
+    columnStyles:{3:{halign:'right'},0:{cellWidth:28},2:{cellWidth:24},4:{cellWidth:22}},
+    margin:{left:14,right:14}
+  });
+
+  // Footer
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFillColor(14,15,26);doc.rect(0,285,210,12,'F');
+    doc.setTextColor(90,95,128);doc.setFontSize(7);doc.setFont('helvetica','normal');
+    doc.text('Ticketero MX · Gestor de Tickets',14,291);
+    doc.text(`Página ${i} de ${pageCount}`,196,291,{align:'right'});
+  }
+
+  doc.save(`Ticketero_MX_${rangeLabel.replace(' ','_')}_${todayStr()}.pdf`);
+  return true;
+}
+
+const SEED=[
+  {store:'Walmart',category:'Supermercado',amount:856.50,notes:'Compra semanal'},
+  {store:'Pemex',category:'Gasolinera',amount:600,notes:'Lleno completo'},
+  {store:'Liverpool',category:'Ropa',amount:1299,notes:'Camisa y pantalón'},
+  {store:'Oxxo',category:'Conveniencia',amount:85.50,notes:''},
+  {store:'Farmacias del Ahorro',category:'Farmacia',amount:234,notes:'Medicamentos'},
+  {store:'McDonald\'s',category:'Restaurante',amount:195,notes:'Familia'},
+  {store:'Soriana',category:'Supermercado',amount:723,notes:''},
+  {store:'Best Buy',category:'Tecnología',amount:2499,notes:'Audífonos'},
+  {store:'HEB',category:'Supermercado',amount:945.30,notes:''},
+  {store:'Starbucks',category:'Restaurante',amount:168,notes:''},
+  {store:'Cinépolis',category:'Entretenimiento',amount:320,notes:'2 entradas + combo'},
+  {store:'Zara',category:'Ropa',amount:899,notes:''},
+];
+
+/* ─── STORAGE ─── */
+function load(){
+  const raw=localStorage.getItem('tmx-v2');
+  if(raw) return JSON.parse(raw);
+  const now=new Date();
+  return SEED.map((s,i)=>{
+    const d=new Date(now);d.setDate(d.getDate()-i*2);
+    return{id:Date.now()+i,...s,date:d.toISOString().split('T')[0]};
+  });
+}
+function persist(data){localStorage.setItem('tmx-v2',JSON.stringify(data))}
+
+/* ─── CHART HOOK ─── */
+function useChart(ref,config,deps){
+  const inst=useRef(null);
+  useEffect(()=>{
+    if(!ref.current)return;
+    if(inst.current)inst.current.destroy();
+    inst.current=new Chart(ref.current,config());
+    return()=>{if(inst.current)inst.current.destroy()};
+  },deps);
+}
+
+/* ─── TOAST ─── */
+function Toast({toasts}){
+  return<div className="toast-wrap">{toasts.map(t=>(
+    <div key={t.id} className={`toast toast-${t.type}`}>{t.type==='ok'?'✓':'✕'} {t.msg}</div>
+  ))}</div>
+}
+
+/* ─── CAT TAG ─── */
+function CatTag({cat}){return<span className={`cat-tag ct-${cat}`}>{cat}</span>}
+
+/* ─── STAT CARD ─── */
+function StatCard({label,value,hint,color,badge,badgeType}){
+  return<div className="stat-card">
+    <div className="stat-glow" style={{background:color}}/>
+    <div className="stat-label">{label}</div>
+    <div className="stat-val" style={{color}}>{value}</div>
+    <div className="stat-hint">{hint}</div>
+    {badge&&<div className={`stat-badge badge-${badgeType}`}>{badge}</div>}
+  </div>
+}
+
+/* ─── EDIT DRAWER ─── */
+function TicketDrawer({ticket,onClose,onSave,onDelete}){
+  const[edit,setEdit]=useState({
+    time:'',ticketNum:'',city:'',...ticket
+  });
+  const[editing,setEditing]=useState(false);
+
+  function handleSave(){
+    if(!edit.store||!edit.amount||!edit.date){alert('Completa tienda, monto y fecha');return}
+    onSave({...edit,amount:parseFloat(edit.amount)});
+    setEditing(false);
+  }
+
+  const cat=CATS[edit.category]||CATS['Otro'];
+
+  return<div className="drawer-overlay" onClick={e=>{if(e.target.className==='drawer-overlay')onClose()}}>
+    <div className="drawer">
+      <div className="drawer-head">
+        <div style={{fontFamily:'var(--display)',fontSize:13,fontWeight:900,letterSpacing:-0.5}}>TICKET DETALLE</div>
+        <div style={{display:'flex',gap:6}}>
+          {!editing&&<button className="btn-icon" onClick={()=>setEditing(true)} title="Editar">✏️</button>}
+          <button className="btn-icon" onClick={onClose}>✕</button>
+        </div>
+      </div>
+      <div className="drawer-body">
+        {editing?(
+          <>
+            <div className="fg"><label className="flabel">Tienda</label>
+              <input className="edit-field" list="dl-stores" value={edit.store} onChange={e=>setEdit(p=>({...p,store:e.target.value}))}/>
+              <datalist id="dl-stores">{STORES.map(s=><option key={s} value={s}/>)}</datalist>
+            </div>
+            <div className="frow">
+              <div className="fg"><label className="flabel">Monto ($)</label>
+                <input className="edit-field" type="number" step="0.01" value={edit.amount} onChange={e=>setEdit(p=>({...p,amount:e.target.value}))}/>
+              </div>
+              <div className="fg"><label className="flabel">No. Ticket</label>
+                <input className="edit-field" placeholder="Folio opcional" value={edit.ticketNum||''} onChange={e=>setEdit(p=>({...p,ticketNum:e.target.value}))}/>
+              </div>
+            </div>
+            <div className="frow">
+              <div className="fg"><label className="flabel">Fecha</label>
+                <input className="edit-field" type="date" value={edit.date} onChange={e=>setEdit(p=>({...p,date:e.target.value}))}/>
+              </div>
+              <div className="fg"><label className="flabel">Hora</label>
+                <input className="edit-field" type="time" value={edit.time||''} onChange={e=>setEdit(p=>({...p,time:e.target.value}))}/>
+              </div>
+            </div>
+            <div className="fg"><label className="flabel">Categoría</label>
+              <select className="edit-field" value={edit.category} onChange={e=>setEdit(p=>({...p,category:e.target.value}))}>
+                {Object.keys(CATS).map(c=><option key={c} value={c}>{CATS[c].e} {c}</option>)}
+              </select>
+            </div>
+            <div className="fg"><label className="flabel">Ciudad</label>
+              <input className="edit-field" list="dl-ciudades-e" placeholder="Ciudad..." value={edit.city||''} onChange={e=>setEdit(p=>({...p,city:e.target.value}))}/>
+              <datalist id="dl-ciudades-e">{CIUDADES_MX.map(c=><option key={c} value={c}/>)}</datalist>
+            </div>
+            <div className="fg"><label className="flabel">Notas</label>
+              <input className="edit-field" placeholder="Descripción opcional..." value={edit.notes||''} onChange={e=>setEdit(p=>({...p,notes:e.target.value}))}/>
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:6}}>
+              <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{setEdit({...ticket});setEditing(false)}}>Cancelar</button>
+              <button className="btn btn-primary btn-sm" style={{flex:2}} onClick={handleSave}>💾 Guardar cambios</button>
+            </div>
+          </>
+        ):(
+          <>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <span style={{fontSize:32}}>{cat.e}</span>
+            </div>
+            <div className="drawer-store">{ticket.store}</div>
+            <div className="drawer-amount">{fmt(ticket.amount)}</div>
+            <div className="drawer-meta">
+              <CatTag cat={ticket.category}/>
+              {ticket.notes&&<span style={{fontSize:11,color:'var(--muted2)'}}>{ticket.notes}</span>}
+            </div>
+            <div className="divider"/>
+            {ticket.imageData&&<>
+              <div className="detail-label" style={{marginBottom:8}}>FOTO DEL TICKET</div>
+              <img src={ticket.imageData} style={{width:'100%',borderRadius:8,border:'1px solid var(--border)',marginBottom:12,maxHeight:220,objectFit:'cover'}}/>
+            </>}
+            <div className="detail-row">
+              <span className="detail-label">Fecha</span>
+              <span className="detail-val">{fmtDate(ticket.date)}</span>
+            </div>
+            {ticket.time&&<div className="detail-row">
+              <span className="detail-label">Hora</span>
+              <span className="detail-val" style={{fontFamily:'var(--mono)'}}>{ticket.time}</span>
+            </div>}
+            {ticket.ticketNum&&<div className="detail-row">
+              <span className="detail-label">No. Ticket / Folio</span>
+              <span className="detail-val" style={{fontFamily:'var(--mono)'}}>{ticket.ticketNum}</span>
+            </div>}
+            {ticket.city&&<div className="detail-row">
+              <span className="detail-label">Ciudad</span>
+              <span className="detail-val">📍 {ticket.city}</span>
+            </div>}
+            <div className="detail-row">
+              <span className="detail-label">Categoría</span>
+              <span className="detail-val">{ticket.category}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">ID interno</span>
+              <span className="detail-val" style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--muted)'}}>{ticket.id}</span>
+            </div>
+            <div className="divider"/>
+            <button className="btn btn-danger" style={{width:'100%',justifyContent:'center'}} onClick={()=>onDelete(ticket.id)}>
+              🗑 Eliminar ticket
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+}
+
+const CIUDADES_MX=['Aguascalientes','Cancún','Chihuahua','Ciudad de México','Ciudad Juárez',
+  'Culiacán','Ecatepec','Guadalajara','Hermosillo','León','Mérida','Mexicali','Monterrey',
+  'Morelia','Naucalpan','Nezahualcóyotl','Oaxaca','Puebla','Querétaro','Saltillo',
+  'San Luis Potosí','Tijuana','Tlalnepantla','Toluca','Torreón','Tuxtla Gutiérrez',
+  'Veracruz','Villahermosa','Xalapa','Zapopan'];
+
+function nowTimeStr(){const n=new Date();return`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`}
+
+/* ─── NEW TICKET MODAL ─── */
+function NewTicketModal({onClose,onSave}){
+  const[tab,setTab]=useState('manual');
+  const[form,setForm]=useState({
+    store:'',amount:'',category:'Supermercado',
+    date:todayStr(),time:nowTimeStr(),
+    ticketNum:'',ticketNumVerify:'',
+    city:'',notes:'',imageData:null
+  });
+  const[aiState,setAiState]=useState(null);
+  const[imgPreview,setImgPreview]=useState(null);
+
+  function f(k,v){setForm(p=>({...p,[k]:v}))}
+
+  // Solo guarda la foto como evidencia, SIN IA — usado en tab manual
+  function attachImage(file){
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=e=>{setImgPreview(e.target.result);setForm(p=>({...p,imageData:e.target.result}))}
+    reader.readAsDataURL(file);
+  }
+
+  // Analiza con IA y autocompleta campos — usado en tab scan
+  async function processImage(file){
+    if(!file)return;
+    const reader0=new FileReader();
+    reader0.onload=e=>{setImgPreview(e.target.result);setForm(p=>({...p,imageData:e.target.result}))}
+    reader0.readAsDataURL(file);
+    setAiState('loading');
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      const b64=reader.result.split(',')[1];
+      try{
+        const res=await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            model:'claude-sonnet-4-20250514',max_tokens:1000,
+            messages:[{role:'user',content:[
+              {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
+              {type:'text',text:`Analiza este ticket/recibo y extrae los datos. Responde SOLO con JSON sin backticks:\n{"store":"nombre tienda","amount":123.45,"category":"Supermercado|Ropa|Gasolinera|Tecnología|Restaurante|Farmacia|Conveniencia|Entretenimiento|Otro","date":"YYYY-MM-DD","time":"HH:MM","ticketNum":"número o folio del ticket si aparece","city":"ciudad si aparece","notes":"descripción breve"}`}
+            ]}]
+          })
+        });
+        const data=await res.json();
+        const txt=data.content?.[0]?.text||'';
+        const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+        setForm(p=>({...p,
+          store:parsed.store||p.store,
+          amount:parsed.amount||p.amount,
+          category:parsed.category in CATS?parsed.category:p.category,
+          date:parsed.date||p.date,
+          time:parsed.time||p.time,
+          ticketNum:parsed.ticketNum||p.ticketNum,
+          ticketNumVerify:parsed.ticketNum||p.ticketNumVerify,
+          city:parsed.city||p.city,
+          notes:parsed.notes||p.notes
+        }));
+        setAiState({ok:true,msg:`✓ Detectado: ${parsed.store} · ${fmt(parsed.amount)}`});
+        setTab('manual');
+      }catch(err){
+        setAiState({ok:false,msg:'No se pudo leer el ticket: '+err.message});
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleScan(e){ await processImage(e.target.files[0]) }
+
+  function save(){
+    if(!form.store||!form.amount||!form.date){alert('Completa tienda, monto y fecha');return}
+    if(form.ticketNum&&form.ticketNumVerify&&form.ticketNum!==form.ticketNumVerify){
+      alert('⚠️ Los números de ticket no coinciden, verifica');return
+    }
+    onSave({id:Date.now(),...form,amount:parseFloat(form.amount)});
+  }
+
+  return<div className="overlay" onClick={e=>{if(e.target.className==='overlay')onClose()}}>
+    <div className="modal">
+      <div className="modal-head">
+        <div className="modal-title-text">Nuevo Ticket</div>
+        <button className="btn-icon" onClick={onClose}>✕</button>
+      </div>
+      <div className="modal-body">
+        <div className="tabs-row">
+          <div className={`ftab${tab==='manual'?' on':''}`} onClick={()=>setTab('manual')}>✍️ Manual</div>
+          <div className={`ftab${tab==='scan'?' on':''}`} onClick={()=>setTab('scan')}>📸 Escanear IA</div>
+        </div>
+
+        {tab==='scan'?(
+          <>
+            <div className="scan-drop">
+              <input type="file" accept="image/*" onChange={handleScan}/>
+              <div className="scan-emoji">{imgPreview?'✅':'📸'}</div>
+              <div className="scan-hint">{imgPreview?'Imagen cargada — datos extraídos':'Sube foto de tu ticket'}<br/><strong>IA extrae datos automáticamente</strong></div>
+            </div>
+            {imgPreview&&<img src={imgPreview} style={{width:'100%',borderRadius:8,marginTop:10,maxHeight:180,objectFit:'cover',border:'1px solid var(--border)'}}/>}
+            {aiState==='loading'&&<div className="ai-status ai-loading"><div className="spin"/><span>Analizando con IA...</span></div>}
+            {aiState&&aiState!=='loading'&&<div className={`ai-status ${aiState.ok?'ai-ok':'ai-err'}`}>{aiState.msg}</div>}
+          </>
+        ):(
+          <>
+            {/* Foto del ticket en manual */}
+            <div className="fg">
+              <label className="flabel">Foto del ticket (opcional)</label>
+              <div className="scan-drop" style={{padding:'14px',display:'flex',alignItems:'center',gap:12,textAlign:'left'}}>
+                <input type="file" accept="image/*" onChange={e=>attachImage(e.target.files[0])}/>
+                {imgPreview
+                  ?<><img src={imgPreview} style={{width:56,height:56,objectFit:'cover',borderRadius:6,flexShrink:0,border:'1px solid var(--border)'}}/><div><div style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>Foto adjuntada</div><div style={{fontSize:11,color:'var(--muted)'}}>Solo como evidencia · llena los campos manualmente</div></div></>
+                  :<><span style={{fontSize:24}}>📎</span><div><div style={{fontSize:12,fontWeight:700}}>Adjuntar foto del ticket</div><div style={{fontSize:11,color:'var(--muted)'}}>Solo como evidencia, sin IA</div></div></>
+                }
+              </div>
+            </div>
+
+            <div className="frow">
+              <div className="fg"><label className="flabel">Tienda</label>
+                <input className="fc" list="dl2" placeholder="Walmart, Oxxo..." value={form.store} onChange={e=>f('store',e.target.value)}/>
+                <datalist id="dl2">{STORES.map(s=><option key={s} value={s}/>)}</datalist>
+              </div>
+              <div className="fg"><label className="flabel">Categoría</label>
+                <select className="fc" value={form.category} onChange={e=>f('category',e.target.value)}>
+                  {Object.keys(CATS).map(c=><option key={c} value={c}>{CATS[c].e} {c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="frow">
+              <div className="fg"><label className="flabel">Total ($)</label>
+                <input className="fc" type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={e=>f('amount',e.target.value)}/>
+              </div>
+              <div className="fg"><label className="flabel">Ciudad</label>
+                <input className="fc" list="dl-ciudades" placeholder="Ej: Querétaro..." value={form.city} onChange={e=>f('city',e.target.value)}/>
+                <datalist id="dl-ciudades">{CIUDADES_MX.map(c=><option key={c} value={c}/>)}</datalist>
+              </div>
+            </div>
+            <div className="frow">
+              <div className="fg"><label className="flabel">Fecha</label>
+                <input className="fc" type="date" value={form.date} onChange={e=>f('date',e.target.value)}/>
+              </div>
+              <div className="fg"><label className="flabel">Hora</label>
+                <input className="fc" type="time" value={form.time} onChange={e=>f('time',e.target.value)}/>
+              </div>
+            </div>
+            <div className="frow">
+              <div className="fg">
+                <label className="flabel">No. Ticket / Folio</label>
+                <input className="fc" placeholder="Ej: 00123456" value={form.ticketNum} onChange={e=>f('ticketNum',e.target.value)}
+                  style={form.ticketNum&&form.ticketNumVerify&&form.ticketNum!==form.ticketNumVerify?{borderColor:'var(--red)'}:{}}/>
+              </div>
+              <div className="fg">
+                <label className="flabel">Verificar No. Ticket</label>
+                <input className="fc" placeholder="Repite el número" value={form.ticketNumVerify} onChange={e=>f('ticketNumVerify',e.target.value)}
+                  style={form.ticketNum&&form.ticketNumVerify
+                    ?(form.ticketNum===form.ticketNumVerify?{borderColor:'var(--green)'}:{borderColor:'var(--red)'}):{}}/>
+              </div>
+            </div>
+            {form.ticketNum&&form.ticketNumVerify&&form.ticketNum!==form.ticketNumVerify&&(
+              <div style={{fontSize:11,color:'var(--red)',marginTop:-8,marginBottom:8}}>⚠️ Los números no coinciden</div>
+            )}
+            {form.ticketNum&&form.ticketNumVerify&&form.ticketNum===form.ticketNumVerify&&(
+              <div style={{fontSize:11,color:'var(--green)',marginTop:-8,marginBottom:8}}>✓ Número verificado</div>
+            )}
+            <div className="fg"><label className="flabel">Notas</label>
+              <input className="fc" placeholder="Descripción opcional..." value={form.notes} onChange={e=>f('notes',e.target.value)}/>
+            </div>
+          </>
+        )}
+
+        <div style={{display:'flex',gap:8,marginTop:6}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" style={{flex:2,justifyContent:'center'}} onClick={save}>💾 Guardar Ticket</button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+/* ─── DASHBOARD ─── */
+function Dashboard({tickets,onNew}){
+  const catRef=useRef();const storeRef=useRef();const dailyRef=useRef();
+  const curMonth=monthStr();
+  const mt=tickets.filter(t=>t.date.startsWith(curMonth));
+  const total=mt.reduce((s,t)=>s+t.amount,0);
+  const avg=mt.length?total/mt.length:0;
+
+  const prevMonth=monthStr(new Date(new Date().setMonth(new Date().getMonth()-1)));
+  const pt=tickets.filter(t=>t.date.startsWith(prevMonth));
+  const prevTotal=pt.reduce((s,t)=>s+t.amount,0);
+  const diff=prevTotal?((total-prevTotal)/prevTotal*100).toFixed(1):null;
+
+  const storeCount={};mt.forEach(t=>{storeCount[t.store]=(storeCount[t.store]||0)+1});
+  const topStore=Object.entries(storeCount).sort((a,b)=>b[1]-a[1])[0];
+
+  const catT={};mt.forEach(t=>{catT[t.category]=(catT[t.category]||0)+t.amount});
+  const topCatEntries=Object.entries(catT).sort((a,b)=>b[1]-a[1]);
+
+  const storeT={};mt.forEach(t=>{storeT[t.store]=(storeT[t.store]||0)+t.amount});
+  const topStores=Object.entries(storeT).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // daily last 30
+  const days={};
+  for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().split('T')[0];days[k]=0}
+  tickets.forEach(t=>{if(days[t.date]!==undefined)days[t.date]+=t.amount});
+
+  useChart(catRef,()=>({
+    type:'doughnut',
+    data:{labels:topCatEntries.map(x=>x[0]),datasets:[{data:topCatEntries.map(x=>x[1]),backgroundColor:CHART_COLORS,borderWidth:0}]},
+    options:{plugins:{legend:{labels:{color:'#7a7fa0',font:{family:'Manrope',size:11}}}},cutout:'68%'}
+  }),[JSON.stringify(mt)]);
+
+  useChart(storeRef,()=>({
+    type:'bar',
+    data:{labels:topStores.map(x=>x[0]),datasets:[{data:topStores.map(x=>x[1]),backgroundColor:'rgba(0,232,122,0.25)',borderColor:'#00e87a',borderWidth:1,borderRadius:6}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a5f80',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#9a9fc0',font:{family:'Manrope',size:11}},grid:{display:false}}}}
+  }),[JSON.stringify(mt)]);
+
+  useChart(dailyRef,()=>({
+    type:'line',
+    data:{labels:Object.keys(days).map(d=>d.slice(5)),datasets:[{data:Object.values(days),borderColor:'#4488ff',backgroundColor:'rgba(68,136,255,0.07)',fill:true,tension:0.4,pointRadius:2,pointBackgroundColor:'#4488ff'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a5f80',font:{family:'DM Mono',size:8},maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{color:'#5a5f80',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  }),[JSON.stringify(tickets)]);
+
+  const now=new Date();
+  const monthLabel=now.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+
+  return<>
+    <div className="topbar">
+      <div>
+        <div className="page-title">Dashboard <em>MX</em></div>
+        <div className="page-subtitle">{monthLabel} · {mt.length} tickets este mes</div>
+      </div>
+      <button className="btn btn-primary" onClick={onNew}>＋ Nuevo Ticket</button>
+    </div>
+    <div className="page-body">
+      <div className="stats-grid">
+        <StatCard label="Gasto Total" value={fmt(total)} hint="este mes" color="var(--green)"
+          badge={diff?`${diff>0?'↑':'↓'} ${Math.abs(diff)}% vs mes ant.`:null} badgeType={diff>0?'dn':'up'}/>
+        <StatCard label="Tickets" value={mt.length} hint={`${tickets.length} total histórico`} color="var(--blue)"/>
+        <StatCard label="Tienda Frecuente" value={topStore?topStore[0]:'—'} hint={topStore?`${topStore[1]} visitas`:'este mes'} color="var(--amber)"/>
+        <StatCard label="Ticket Promedio" value={fmt(avg)} hint="por compra" color="var(--purple)"/>
+      </div>
+
+      <div className="charts-row">
+        <div className="chart-card">
+          <div className="chart-label"><span>💸 GASTO POR CATEGORÍA</span><span style={{color:'var(--muted)',fontSize:9}}>{monthLabel.toUpperCase()}</span></div>
+          <canvas ref={catRef}/>
+        </div>
+        <div className="chart-card">
+          <div className="chart-label">🏪 TOP TIENDAS</div>
+          <canvas ref={storeRef}/>
+        </div>
+      </div>
+
+      <div className="chart-card-full">
+        <div className="chart-label">📈 GASTO DIARIO — ÚLTIMOS 30 DÍAS</div>
+        <canvas ref={dailyRef}/>
+      </div>
+
+      <div className="chart-label" style={{marginBottom:12}}>🕐 ÚLTIMOS TICKETS</div>
+      {tickets.slice(0,5).length===0?<div className="empty"><div className="empty-ico">🧾</div><div className="empty-msg">Sin tickets aún</div></div>:(
+        <table className="ticket-table">
+          <thead><tr>
+            <th>TIENDA</th><th>CATEGORÍA</th><th>MONTO</th><th>FECHA</th>
+          </tr></thead>
+          <tbody>
+            {tickets.slice(0,5).map(t=>(
+              <tr key={t.id} className="ticket-row-tr">
+                <td><div className="store-cell">
+                  <div className="store-icon">{(CATS[t.category]||CATS['Otro']).e}</div>
+                  <div><div className="store-name">{t.store}</div>{t.notes&&<div className="store-date">{t.notes}</div>}</div>
+                </div></td>
+                <td><CatTag cat={t.category}/></td>
+                <td><div className="amount-cell">{fmt(t.amount)}</div></td>
+                <td><span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--muted2)'}}>{t.date}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </>
+}
+
+/* ─── TICKETS PAGE ─── */
+function TicketsPage({tickets,onNew,onView,onDelete}){
+  const[q,setQ]=useState('');
+  const[filter,setFilter]=useState('todos');
+
+  const list=useMemo(()=>{
+    let r=[...tickets];
+    if(filter!=='todos')r=r.filter(t=>t.category===filter);
+    if(q)r=r.filter(t=>t.store.toLowerCase().includes(q.toLowerCase())||t.category.toLowerCase().includes(q.toLowerCase())||t.notes?.toLowerCase().includes(q.toLowerCase()));
+    return r;
+  },[tickets,filter,q]);
+
+  const FILTERS=['todos',...Object.keys(CATS)];
+
+  return<>
+    <div className="topbar">
+      <div>
+        <div className="page-title">Mis <em>Tickets</em></div>
+        <div className="page-subtitle">{list.length} de {tickets.length} registros</div>
+      </div>
+      <button className="btn btn-primary" onClick={onNew}>＋ Nuevo Ticket</button>
+    </div>
+    <div className="page-body">
+      <div className="filter-row">
+        <div className="search-wrap">
+          <span className="search-icon">🔍</span>
+          <input className="search-input" placeholder="Buscar tienda, categoría..." value={q} onChange={e=>setQ(e.target.value)}/>
+        </div>
+        {FILTERS.slice(0,7).map(f=>(
+          <div key={f} className={`pill${filter===f?' on':''}`} onClick={()=>setFilter(f)}>
+            {f==='todos'?'Todos':`${CATS[f]?.e||''} ${f}`}
+          </div>
+        ))}
+      </div>
+
+      {list.length===0?<div className="empty"><div className="empty-ico">🔍</div><div className="empty-msg">Sin resultados</div></div>:(
+        <table className="ticket-table">
+          <thead><tr>
+            <th>TIENDA</th><th>CATEGORÍA</th><th>MONTO</th><th>FECHA</th><th></th>
+          </tr></thead>
+          <tbody>
+            {list.map(t=>(
+              <tr key={t.id} className="ticket-row-tr" onClick={()=>onView(t)}>
+                <td><div className="store-cell">
+                  <div className="store-icon">{(CATS[t.category]||CATS['Otro']).e}</div>
+                  <div>
+                    <div className="store-name">{t.store}</div>
+                    {t.notes&&<div className="store-date">{t.notes}</div>}
+                  </div>
+                </div></td>
+                <td><CatTag cat={t.category}/></td>
+                <td><div className="amount-cell">{fmt(t.amount)}</div></td>
+                <td><span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--muted2)'}}>{t.date}</span></td>
+                <td onClick={e=>e.stopPropagation()}>
+                  <div className="actions-cell">
+                    <button className="btn-icon" title="Ver/Editar" onClick={()=>onView(t)}>✏️</button>
+                    <button className="btn-icon" title="Eliminar" onClick={()=>onDelete(t.id)} style={{color:'var(--red)'}}>🗑</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </>
+}
+
+/* ─── TIMELINE ─── */
+function TimelinePage({tickets,onView}){
+  const grouped=useMemo(()=>{
+    const g={};
+    tickets.forEach(t=>{if(!g[t.date])g[t.date]=[];g[t.date].push(t)});
+    return Object.entries(g).sort((a,b)=>b[0].localeCompare(a[0]));
+  },[tickets]);
+
+  return<>
+    <div className="topbar">
+      <div><div className="page-title">Historial <em>Timeline</em></div><div className="page-subtitle">Todos tus movimientos cronológicos</div></div>
+    </div>
+    <div className="page-body">
+      {grouped.length===0?<div className="empty"><div className="empty-ico">📅</div><div className="empty-msg">Sin historial</div></div>:(
+        <div className="tl-day" style={{all:'unset',display:'block'}}>
+          {grouped.map(([date,items])=>{
+            const dayTotal=items.reduce((s,t)=>s+t.amount,0);
+            const d=new Date(date+'T12:00:00');
+            const label=d.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+            return<div className="tl-day" key={date}>
+              <div className="tl-date-label">{label} · <strong style={{color:'var(--green)'}}>{fmt(dayTotal)}</strong></div>
+              <div className="tl-items">
+                {items.map(t=>(
+                  <div key={t.id} className="tl-item" onClick={()=>onView(t)}>
+                    <span style={{fontSize:20}}>{(CATS[t.category]||CATS['Otro']).e}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{t.store}</div>
+                      <div style={{fontSize:11,color:'var(--muted2)'}}>{t.category}{t.notes?` · ${t.notes}`:''}</div>
+                    </div>
+                    <div style={{fontFamily:'var(--display)',fontWeight:900,fontSize:14,color:'var(--green)'}}>{fmt(t.amount)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          })}
+        </div>
+      )}
+    </div>
+  </>
+}
+
+/* ─── COMPARATIVAS ─── */
+function ComparativasPage({tickets}){
+  const monthlyRef=useRef();const catMonthRef=useRef();const trendRef=useRef();const pctRef=useRef();
+
+  const byMonth=useMemo(()=>{
+    const bm={};
+    tickets.forEach(t=>{
+      const m=t.date.slice(0,7);
+      if(!bm[m])bm[m]={total:0,cats:{},count:0};
+      bm[m].total+=t.amount;bm[m].count++;
+      bm[m].cats[t.category]=(bm[m].cats[t.category]||0)+t.amount;
+    });
+    return bm;
+  },[tickets]);
+
+  const months=Object.keys(byMonth).sort().slice(-6);
+  const labels=months.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1).toLocaleDateString('es-MX',{month:'short',year:'2-digit'})});
+
+  useChart(monthlyRef,()=>({
+    type:'bar',
+    data:{labels,datasets:[{data:months.map(m=>byMonth[m].total),backgroundColor:'rgba(0,232,122,0.2)',borderColor:'#00e87a',borderWidth:2,borderRadius:8}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9a9fc0',font:{family:'Manrope'}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#5a5f80',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  }),[JSON.stringify(byMonth)]);
+
+  const allCats=[...new Set(tickets.map(t=>t.category))];
+  useChart(catMonthRef,()=>({
+    type:'bar',
+    data:{labels,datasets:allCats.map((cat,i)=>({label:cat,data:months.map(m=>(byMonth[m]?.cats[cat]||0)),backgroundColor:CHART_COLORS[i%CHART_COLORS.length]+'33',borderColor:CHART_COLORS[i%CHART_COLORS.length],borderWidth:1,borderRadius:4}))},
+    options:{scales:{x:{stacked:true,ticks:{color:'#9a9fc0',font:{family:'Manrope',size:10}},grid:{display:false}},y:{stacked:true,ticks:{color:'#5a5f80',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}}},plugins:{legend:{labels:{color:'#9a9fc0',font:{family:'Manrope',size:10}}}}}
+  }),[JSON.stringify(byMonth)]);
+
+  useChart(trendRef,()=>({
+    type:'line',
+    data:{labels,datasets:[{label:'Ticket promedio',data:months.map(m=>byMonth[m].count?byMonth[m].total/byMonth[m].count:0),borderColor:'#ffb020',backgroundColor:'rgba(255,176,32,0.07)',fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#ffb020'}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#9a9fc0',font:{family:'Manrope',size:10}},grid:{display:false}},y:{ticks:{color:'#5a5f80',font:{family:'DM Mono',size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  }),[JSON.stringify(byMonth)]);
+
+  useChart(pctRef,()=>({
+    type:'radar',
+    data:{labels:allCats,datasets:months.slice(-2).map((m,i)=>({label:labels[labels.length-2+i],data:allCats.map(c=>byMonth[m]?.cats[c]||0),borderColor:i===0?'rgba(68,136,255,0.6)':'rgba(0,232,122,0.6)',backgroundColor:i===0?'rgba(68,136,255,0.07)':'rgba(0,232,122,0.07)',borderWidth:2,pointRadius:3}))},
+    options:{plugins:{legend:{labels:{color:'#9a9fc0',font:{family:'Manrope',size:10}}}},scales:{r:{ticks:{display:false},grid:{color:'rgba(255,255,255,0.06)'},pointLabels:{color:'#7a7fa0',font:{family:'Manrope',size:10}}}}}
+  }),[JSON.stringify(byMonth)]);
+
+  return<>
+    <div className="topbar">
+      <div><div className="page-title">Comparativas <em>Mensuales</em></div><div className="page-subtitle">Análisis histórico de tus gastos</div></div>
+    </div>
+    <div className="page-body">
+      <div className="chart-card-full">
+        <div className="chart-label">📊 GASTO MENSUAL TOTAL</div>
+        <canvas ref={monthlyRef}/>
+      </div>
+      <div className="comp-grid" style={{marginBottom:14}}>
+        <div className="chart-card">
+          <div className="chart-label">🏷️ CATEGORÍAS POR MES</div>
+          <canvas ref={catMonthRef}/>
+        </div>
+        <div className="chart-card">
+          <div className="chart-label">📉 TICKET PROMEDIO</div>
+          <canvas ref={trendRef}/>
+        </div>
+      </div>
+      <div className="chart-card-full">
+        <div className="chart-label">🕸️ RADAR — ÚLTIMOS 2 MESES</div>
+        <canvas ref={pctRef} style={{maxHeight:280}}/>
+      </div>
+    </div>
+  </>
+}
+
+/* ─── EXPORT MODAL ─── */
+function ExportModal({tickets,onClose,toast}){
+  const[fmt2,setFmt2]=useState('pdf');
+  const[range,setRange]=useState('mes');
+
+  const count=filterByRange(tickets,range).length;
+  const total=filterByRange(tickets,range).reduce((s,t)=>s+t.amount,0);
+  const rangeLabels={'mes':'Este mes','trimestre':'Últimos 3 meses','año':'Este año','todo':'Histórico completo'};
+
+  function doExport(){
+    let ok=false;
+    if(fmt2==='excel') ok=exportExcel(tickets,range);
+    else ok=exportPDF(tickets,range);
+    if(ok){toast(`${fmt2.toUpperCase()} generado con ${count} tickets 🎉`);onClose();}
+    else toast('Sin tickets en ese rango','err');
+  }
+
+  return<div className="overlay" onClick={e=>{if(e.target.className==='overlay')onClose()}}>
+    <div className="modal">
+      <div className="modal-head">
+        <div className="modal-title-text">Exportar Reporte</div>
+        <button className="btn-icon" onClick={onClose}>✕</button>
+      </div>
+      <div className="modal-body">
+        <div style={{marginBottom:14}}>
+          <div className="flabel" style={{marginBottom:10}}>FORMATO</div>
+          <div className="export-options">
+            <div className={`export-card${fmt2==='pdf'?' selected':''}`} onClick={()=>setFmt2('pdf')}>
+              <div className="export-icon">📄</div>
+              <div className="export-name">PDF</div>
+              <div className="export-desc">Reporte visual con tablas y resumen por categoría</div>
+            </div>
+            <div className={`export-card${fmt2==='excel'?' selected':''}`} onClick={()=>setFmt2('excel')}>
+              <div className="export-icon">📊</div>
+              <div className="export-name">Excel</div>
+              <div className="export-desc">2 hojas: detalle de tickets + resumen por categoría</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flabel" style={{marginBottom:10}}>RANGO DE FECHAS</div>
+        <div className="export-range">
+          {Object.entries(rangeLabels).map(([k,v])=>(
+            <div key={k} className={`export-range-btn${range===k?' on':''}`} onClick={()=>setRange(k)}>{v}</div>
+          ))}
+        </div>
+
+        <div className="export-preview">
+          📋 {rangeLabels[range]} · <strong>{count} tickets</strong> · Total: <strong>{fmt(total)}</strong>
+        </div>
+
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary" style={{flex:2,justifyContent:'center'}} onClick={doExport}>
+            {fmt2==='pdf'?'📄':'📊'} Descargar {fmt2.toUpperCase()}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+/* ─── ROOT APP ─── */
+function App(){
+  const[tickets,setTickets]=useState(()=>load());
+  const[page,setPage]=useState('dashboard');
+  const[modal,setModal]=useState(false);
+  const[exportModal,setExportModal]=useState(false);
+  const[drawer,setDrawer]=useState(null);
+  const[toasts,setToasts]=useState([]);
+
+  function toast(msg,type='ok'){
+    const id=Date.now();
+    setToasts(p=>[...p,{id,msg,type}]);
+    setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),2800);
+  }
+
+  function save(data){setTickets(data);persist(data)}
+
+  function addTicket(t){const n=[t,...tickets];save(n);setModal(false);toast('Ticket guardado')}
+  function deleteTicket(id){if(!confirm('¿Eliminar?'))return;const n=tickets.filter(t=>t.id!==id);save(n);setDrawer(null);toast('Ticket eliminado','err')}
+  function editTicket(updated){const n=tickets.map(t=>t.id===updated.id?updated:t);save(n);setDrawer(null);toast('Ticket actualizado')}
+
+  const curMonth=monthStr();
+  const mt=tickets.filter(t=>t.date.startsWith(curMonth));
+  const monthTotal=mt.reduce((s,t)=>s+t.amount,0);
+
+  const NAV=[
+    {id:'dashboard',icon:'📊',label:'Dashboard'},
+    {id:'tickets',icon:'🧾',label:'Tickets'},
+    {id:'timeline',icon:'📅',label:'Historial'},
+    {id:'comparativas',icon:'📈',label:'Comparativas'},
+  ];
+
+  return<div className="layout">
+    <aside className="sidebar">
+      <div className="logo-wrap">
+        <div className="logo-main">Ticketero</div>
+        <div className="logo-sub">MX · Gestor de tickets</div>
+      </div>
+      <nav className="nav">
+        {NAV.map(n=>(
+          <div key={n.id} className={`nav-item${page===n.id?' active':''}`} onClick={()=>setPage(n.id)}>
+            <span className="nav-icon">{n.icon}</span>{n.label}
+          </div>
+        ))}
+        <div style={{margin:'8px 10px 0'}}>
+          <div style={{height:1,background:'var(--border)',marginBottom:8}}/>
+          <div className="nav-item" onClick={()=>setExportModal(true)}>
+            <span className="nav-icon">⬇️</span>Exportar
+          </div>
+        </div>
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="balance-card">
+          <div className="balance-label">Total este mes</div>
+          <div className="balance-amount">{fmt(monthTotal)}</div>
+          <div className="balance-sub">{mt.length} tickets registrados</div>
+        </div>
+      </div>
+    </aside>
+
+    <main className="content">
+      {page==='dashboard'&&<Dashboard tickets={tickets} onNew={()=>setModal(true)}/>}
+      {page==='tickets'&&<TicketsPage tickets={tickets} onNew={()=>setModal(true)} onView={setDrawer} onDelete={deleteTicket}/>}
+      {page==='timeline'&&<TimelinePage tickets={tickets} onView={setDrawer}/>}
+      {page==='comparativas'&&<ComparativasPage tickets={tickets}/>}
+    </main>
+
+    {modal&&<NewTicketModal onClose={()=>setModal(false)} onSave={addTicket}/>}
+    {exportModal&&<ExportModal tickets={tickets} onClose={()=>setExportModal(false)} toast={toast}/>}
+    {drawer&&<TicketDrawer ticket={drawer} onClose={()=>setDrawer(null)} onSave={editTicket} onDelete={deleteTicket}/>}
+    <Toast toasts={toasts}/>
+  </div>
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
